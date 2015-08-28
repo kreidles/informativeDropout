@@ -25,7 +25,7 @@
 #' A class containing the current state of the model
 #' during a RJMCMC run
 #'
-modelInformation <- function(knots=NULL, method="bayesian", X=NULL, ) {
+modelIteration <- function(knots=NULL, X=NULL, ) {
   mi = list(
     knots = knots,
     X=X,
@@ -33,12 +33,13 @@ modelInformation <- function(knots=NULL, method="bayesian", X=NULL, ) {
     beta0=NULL,
     ThetaStar=NULL,
     knotAdded = FALSE,
+    betaC = NULL,
     acceptance=list(knot.add=FALSE, knot.remove=FALSE, knot.move=FALSE,
                     fixedEffects=FALSE, randomEffects=FALSE, varianceComponents=FALSE)
     
   )
   
-  class(mi) <- append(class(mi), "modelInformation")
+  class(mi) <- append(class(mi), "modelIteration")
   return(mi)
 
 }
@@ -53,11 +54,12 @@ modelInformation <- function(knots=NULL, method="bayesian", X=NULL, ) {
 #' @examples
 #' add(1, 1)
 #' add(10, 1)
-addKnot <- function(data, modelInformation.previous, knots.options) {
+addKnot <- function(data, group, outcomes, treatment, covariates, dropoutTimes, 
+                    times, modelIteration.previous, knots.options) {
   # add a knot by randomly selecting a candidate knot
   index = sample(1:length(knots.options$candidatePositions), 1)
-  newKnot.value = knots.candidatePositions[index]
-  knots <- sort(c(knotPositions, newKnot.value))
+  newKnot.value = knots.options$candidatePositions[index]
+  knots <- sort(c(modelIteration.previous$knots, newKnot.value))
   # get the interior and boundary knots, and grab the position of the knot that
   # was just added
   knots.boundary = range(knots)
@@ -65,14 +67,18 @@ addKnot <- function(data, modelInformation.previous, knots.options) {
   newKnot.position = which(knotstar == newKnot.value)
   
   # Calculate spline transformation of dropout time and create the proposed X matrix
-  Xstar <- ns(data$dropoutTimes, knots=knots.interior, Boundary.knots=knots.boundary, intercept=T)*data$times
+  Xstar <- ns(groupData[,dropoutTimes], knots=knots.interior, Boundary.knots=knots.boundary, intercept=T)*groupData[,times]
 
-  #Calc y-random effects for least squares calculations
-  yls<-as.vector(y[group==1]-bt[i-1]-rep(B1[group.u==1],nobs[group.u==1])-t[group==1]*rep(B2[group.u==1],nobs[group.u==1])-C[group==1,]%*%covar[i-1,])
-  #Calculate least squares estimates for coefficients and differences between LS and current coefficients
-  LS<-ginv(crossprod(Xt.g1))%*%(crossprod(Xt.g1,yls))
+  # Calculate y-random effects for least squares calculations
+  y = groupData[,outcomes]
+  Z = cbind(rep(1,nrow(groupData)), groupData[,times])
+  yls <-as.vector(y - Z %*% modelIteration.previous$alpha - 
+                   as.matrix(groupData[,covariates]) %*% modelIteration.previous$betaC)
+  
+  # Calculate least squares estimates for coefficients and differences between LS and current coefficients
+  LS<-ginv(crossprod(modelIteration.previous$X[[group]]))%*%(crossprod(modelIteration.previous$X[[group]],yls))
   LSstar<-ginv(crossprod(Xstar))%*%(crossprod(Xstar,yls))
-  LSresid<-ct.g1[[i-1]]-LS
+  LSresid<-modelIteration.previous$betaFixed[[group]]-LS
   #Draw a residual for the added coefficient and calculate coefficient transformation
   cjresid<-rnorm(1, 0, sd.resid)
   cj<-LSstar[knotj]+cjresid
@@ -235,34 +241,40 @@ updateCovarianceParameters <- function() {
 #'
 #'
 #'
-_informativeDropout.bayesian.gaussian <- function(iterations, data, covariates, dropoutTimes, 
+_informativeDropout.bayesian.gaussian <- function(data, treatment, covariates, dropoutTimes, 
                                                   times, knots.options, mcmc.options) {
   
 
-  modelInformation = list(iterations)
+  groupList <- unique(data$treatment)
   
-  knotPositions <- knots.startPositions
+  modelIterationList <- list(mcmc.options$iterations)
   
-  for (i in 2:iterations) {
+  knotPositions <- knots.options$startPositions
+  
+  for (i in 2:mcmc.options$iterations) {
+    
+    modelIteration.previous = modelIterationList[i-1]
+    
     for (group in groupList) {
+      groupData = data[data[,treatment] == group]
       # randomly decide to add/remove a knot
-      if (runif(1) < knot.birthProbability && ) {
-        modelInformation[i] = addKnot(modelInformation[i-1], knots.options)
+      if (runif(1) < knots.options$birthProbability && ) {
+        modelIteration.current = addKnot(modelIteration.previous, knots.options)
       } else {
-        modelInformation[i] = removeKnot(modelInformation[i-1], knots.options)                 
+        modelIteration.current = removeKnot(modelIteration.previous, knots.options)                 
       }
       
       # Move knots
-      modelInformation[i] = moveKnots(modelInformation[i], modelInformation[i-1], knots.options)
+      modelIteration.current = moveKnots(modelIteration.current, modelIteration.previous, knots.options)
       
       # update fixed effects (includes coefficients for covariates and time varying slopes)
-      modelInformation[i] = updateFixedEffects(modelInformation[i], modelInformation[i-1], knots.options)
+      modelIteration.current = updateFixedEffects(modelIteration.current, modelIteration.previous, knots.options)
       
       # update random effects
-      modelInformation[i] = updateRandomEffects(modelInformation[i], modelInformation[i-1], knots.options)
+      modelIteration.current = updateRandomEffects(modelIteration.current, modelIteration.previous, knots.options)
       
       # update variance components
-      modelInformation[i] = updateVarianceComponents(modelInformation[i], modelInformation[i-1], knots.options)
+      modelIteration.current = updateVarianceComponents(modelIteration.current, modelIteration.previous, knots.options)
     }    
   }
   
