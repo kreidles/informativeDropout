@@ -56,39 +56,39 @@ addKnot <- function(data, group, outcomes, treatment, covariates, dropoutTimes,
                     times, modelIteration.previous, X.prev, knots.options,
                     prior.options) {
   
-#   ### remove debugging
-#   data=dat[data$hard==1,]
-#   group="1"
-#   outcomes="logcd4"
-#   treatment="hard"
-#   covariates=NA
-#   dropoutTimes="drop"
-#   times = "years"
-#   
-#   knots.options=list(
-#     candidatePositions = candidates.g1,
-#     
-#     min=3, max=10
-#   )
-#   
-#   modelIteration.previous = list(
-#     knots = currentknots.g1,
-#     alpha = c(0, 1),
-#     beta.covar = NA,
-#     Theta = list("1"=(Theta.LSXprev + rnorm(1)))
-#   )
-#   
-#   prior.options = list(sigmaError=1.25^2)
-#   
-#   knots.boundary = range(modelIteration.previous$knots)
-#   knots.interior = modelIteration.previous$knots[-c(1,length(modelIteration.previous$knots))] 
-#   
-#   Xprev = cbind(
-#     rep(1,nrow(data)),
-#     ns(data[,dropoutTimes], knots=knots.interior, Boundary.knots=knots.boundary, intercept=T) * data[,times]
-#   )
-#   ### END DEBUG
-#   
+  #   ### remove debugging
+  #   data=dat[data$hard==1,]
+  #   group="1"
+  #   outcomes="logcd4"
+  #   treatment="hard"
+  #   covariates=NA
+  #   dropoutTimes="drop"
+  #   times = "years"
+  #   
+  #   knots.options=list(
+  #     candidatePositions = candidates.g1,
+  #     
+  #     min=3, max=10
+  #   )
+  #   
+  #   modelIteration.previous = list(
+  #     knots = currentknots.g1,
+  #     alpha = c(0, 1),
+  #     beta.covar = NA,
+  #     Theta = list("1"=(Theta.LSXprev + rnorm(1)))
+  #   )
+  #   
+  #   prior.options = list(sigmaError=1.25^2)
+  #   
+  #   knots.boundary = range(modelIteration.previous$knots)
+  #   knots.interior = modelIteration.previous$knots[-c(1,length(modelIteration.previous$knots))] 
+  #   
+  #   Xprev = cbind(
+  #     rep(1,nrow(data)),
+  #     ns(data[,dropoutTimes], knots=knots.interior, Boundary.knots=knots.boundary, intercept=T) * data[,times]
+  #   )
+  #   ### END DEBUG
+  #   
   
   # add a knot by randomly selecting a candidate knot
   index = sample(1:length(knots.options$candidatePositions), 1)
@@ -255,7 +255,7 @@ removeKnot <- function(data, group, outcomes, treatment, covariates, dropoutTime
   } else {
     return (Xprev, modelIteraton.previous$knots, modelIteration.previous$Theta[[group]], false)          
   }
-          
+  
 }
 
 #' Add a new knot and use a Metropolis-Hastings step
@@ -267,50 +267,85 @@ removeKnot <- function(data, group, outcomes, treatment, covariates, dropoutTime
 #' @examples
 #' add(1, 1)
 #' add(10, 1)
-moveKnot <- function() {
-  #If nknots>2, propose to move interior knot 
-  if(nknots.g1[i]>1){
+moveKnot <- function(data, group, outcomes, treatment, covariates, dropoutTimes, 
+                     times, modelIteration.current, X.prev, knots.options,
+                     prior.options) {
+  
+  knots <- modelIteration.current$knots
+  
+  # If nknots>2, propose to move interior knot 
+  if (length(knots) > 1) {
+    
+    # get boundaries and interior
+    knots.boundary = range(knots)
+    knots.interior = knots[-c(1,length(knots))] 
+    
     #knots can only move to open bins between adjacent knots
     #Pick a knot to move: 
-    knotsm<-sort(c(interior.g1[[i]], boundary.g1[i,])) #Current knots in use
-    m<-sample(knotsm, 1) #Sample a knot to move
-    knotm<-which(knotsm==m) # number of knot to move
-    keep<-sort(c(interior.g1[[i]], boundary.g1[i,]))[-knotm] #Knots to keep
-    potentialknots<-candidates.g1[!(candidates.g1 %in% knotsm)]
-    potentialknots<-potentialknots[potentialknots>(m-step1*3) & potentialknots<(m+step1*3)] #here we only allow movement within some small window
+    knotToMove <- sample(knots, 1) 
+    # get index of knot to be moved
+    index <- which(knots == knotToMove) 
+    # get the knots that are staying in the same place
+    knotsToKeep <- sort(c(knots.interior, knots.boundary))[-index] 
+    
+    # find a new location from the potential knot locations
+    potentialLocations <- knots.options$candidatePositions[!(knots.options$candidatePositions %in% knots)]
+    # here we only allow movement within some small window
+    potentialLocations <- potentialLocations[potentialLocations > (index - knots.options$stepSize[[group]] * 3) & 
+                                               potentialLocations < (index + knots.options$stepSize[[group]] * 3)] 
     
     
-    if (length(potentialknots>0)){prop.move.1<-prop.move.1+1
-                                  if(length(potentialknots)==1){p<-potentialknots
-                                  }else{p<-sample(potentialknots,1)}
-                                  pknotstar<-candidates.g1[!(candidates.g1 %in% c(keep,p))]
-                                  pknotstar<-pknotstar[pknotstar>(p-step1*3) & pknotstar<(p+step1*3)]
-                                  knotstar<-sort(c(keep, p))
-                                  knotstar.b<-range(knotstar)
-                                  knotstar.i<-knotstar[!(knotstar %in% knotstar.b)]
-                                  #Calculate spline transformation of dropout time and proposed X matrix and residuals
-                                  Xstar<-ns(u[group==1], knots=knotstar.i, Boundary.knots=knotstar.b, intercept=T)*t[group==1]
-                                  ystar<-as.vector(y[group==1]-bt[i-1]-Xstar%*%ct.g1[[i]]-rep(B1[group.u==1],nobs[group.u==1])-t[group==1]*rep(B2[group.u==1],nobs[group.u==1])-C[group==1,]%*%covar[i-1,])
-                                  yt<-as.vector(y[group==1]-bt[i-1]-Xt.g1%*%ct.g1[[i]]-rep(B1[group.u==1],nobs[group.u==1])-t[group==1]*rep(B2[group.u==1],nobs[group.u==1])-C[group==1,]%*%covar[i-1,])
-                                  #Calculate the acceptance probability
-                                  rho<-log(length(potentialknots))-log(length(pknotstar))+(crossprod(yt)-crossprod(ystar))/2/sig[i-1]
-                                  if(rho>log(runif(1))){interior.g1[[i]]<-knotstar.i
-                                                        boundary.g1[i,]<-knotstar.b
-                                                        Xt.g1<-Xstar
-                                                        accept.move.1<-accept.move.1+1
-                                  }
-    }}
-  if(nknots.g1[i]==1){potentialknots<-candidates.g1[(candidates.g1 != boundary.g1[i,1])]
-                      potentialknots<-potentialknots[potentialknots>(boundary.g1[i,1]-step1*3) & potentialknots<(boundary.g1[i,1]+step1*3)]
-                      if(length(potentialknots)==1){p<-potentialknots
-                      }else{p<-sample(potentialknots,1)}
-                      pknotstar<-candidates.g1[(candidates.g1 != p)]
-                      pknotstar<-pknotstar[pknotstar>(p-step1*3) & pknotstar<(p+step1*3)]
-                      rho<-log(length(potentialknots))-log(length(pknotstar))
-                      if(rho>log(runif(1))){
-                        boundary.g1[i,1]<-p
-                        accept.move.1<-accept.move.1+1
-                      } 
+    if (length(potentialLocations > 0)) {
+      prop.move.1 <- prop.move.1 + 1
+      if(length(potentialknots) == 1){
+        p <- potentialknots
+      }else{
+        p <- sample(potentialknots,1)
+      }
+      
+      pknotstar<-candidates.g1[!(candidates.g1 %in% c(keep,p))]
+      pknotstar<-pknotstar[pknotstar>(p-step1*3) & pknotstar<(p+step1*3)]
+      knotstar<-sort(c(keep, p))
+      knotstar.b<-range(knotstar)
+      knotstar.i<-knotstar[!(knotstar %in% knotstar.b)]
+      #Calculate spline transformation of dropout time and proposed X matrix and residuals
+      Xstar<-ns(u[group==1], knots=knotstar.i, Boundary.knots=knotstar.b, intercept=T)*t[group==1]
+      ystar<-as.vector(y[group==1]-bt[i-1]-Xstar%*%ct.g1[[i]]-rep(B1[group.u==1],nobs[group.u==1])-t[group==1]*rep(B2[group.u==1],nobs[group.u==1])-C[group==1,]%*%covar[i-1,])
+      yt<-as.vector(y[group==1]-bt[i-1]-Xt.g1%*%ct.g1[[i]]-rep(B1[group.u==1],nobs[group.u==1])-t[group==1]*rep(B2[group.u==1],nobs[group.u==1])-C[group==1,]%*%covar[i-1,])
+      #Calculate the acceptance probability
+      rho<-log(length(potentialknots))-log(length(pknotstar))+(crossprod(yt)-crossprod(ystar))/2/sig[i-1]
+      if(rho>log(runif(1))){interior.g1[[i]]<-knotstar.i
+                            boundary.g1[i,]<-knotstar.b
+                            Xt.g1<-Xstar
+                            accept.move.1<-accept.move.1+1
+      }
+    } else {
+      # nowhere to move to
+      return (knots, false, false)
+    }
+  } else if (length(knots) == 1) {
+    
+    # find a new location from the potential knot locations
+    #     potentialknots<-candidates.g1[(candidates.g1 != boundary.g1[i,1])]
+    potentialLocations <- knots.options$candidatePositions[knots.options$candidatePositions != knotToMove]
+    # here we only allow movement within some small window
+    potentialLocations <- potentialLocations[potentialLocations > (index - knots.options$stepSize[[group]]) & 
+                                               potentialLocations < (index + knots.options$stepSize[[group]])] 
+    # get the new location
+    p <- sample(potentialLocations, 1)  
+    
+    potentialLocations.star <- knots.options$candidatePositions[(knots.options$candidatePositions != p)]
+    potentialLocations.star <- potentialLocations.star[potentialLocations.star > (index - knots.options$stepSize[[group]]) & 
+                                                         potentialLocations.star < (index + knots.options$stepSize[[group]])] 
+    
+    rho <- log(length(potentialLocations)) - log(length(potentialLocations.star))
+    if (rho > log(runif(1))) {
+      return (sort(knotsToKeep, p), true, true)
+    } else {
+      return (sort(knotsToKeep, p), true, false)
+    }
+  } else {
+    return (NA, false, false)
   }
   
 }
