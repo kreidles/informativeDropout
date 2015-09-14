@@ -29,10 +29,12 @@ modelIteration <- function(knots=NULL, X=NULL, ) {
   mi = list(
     knots = knots,
     beta0=NULL,
-    ThetaStar=NULL,
+    Theta=NULL,
     knotAdded = FALSE,
     betaC = NULL,
-    acceptance=list(knot.add=FALSE, knot.remove=FALSE, knot.move=FALSE,
+    proposed=list(knot.add=FALSE, knot.remove=FALSE, knot.move=FALSE,
+                  fixedEffects=FALSE, randomEffects=FALSE, varianceComponents=FALSE)
+    accepted=list(knot.add=FALSE, knot.remove=FALSE, knot.move=FALSE,
                     fixedEffects=FALSE, randomEffects=FALSE, varianceComponents=FALSE)
     
   )
@@ -286,42 +288,59 @@ moveKnot <- function(data, group, outcomes, treatment, covariates, dropoutTimes,
     # get index of knot to be moved
     index <- which(knots == knotToMove) 
     # get the knots that are staying in the same place
-    knotsToKeep <- sort(c(knots.interior, knots.boundary))[-index] 
+    knotsToKeep <- knots[-index] 
     
     # find a new location from the potential knot locations
     potentialLocations <- knots.options$candidatePositions[!(knots.options$candidatePositions %in% knots)]
     # here we only allow movement within some small window
-    potentialLocations <- potentialLocations[potentialLocations > (index - knots.options$stepSize[[group]] * 3) & 
-                                               potentialLocations < (index + knots.options$stepSize[[group]] * 3)] 
+    potentialLocations <- potentialLocations[potentialLocations > (index - knots.options$stepSize[[group]]) & 
+                                               potentialLocations < (index + knots.options$stepSize[[group]])] 
     
     
     if (length(potentialLocations > 0)) {
-      prop.move.1 <- prop.move.1 + 1
-      if(length(potentialknots) == 1){
-        p <- potentialknots
-      }else{
-        p <- sample(potentialknots,1)
-      }
-      
-      pknotstar<-candidates.g1[!(candidates.g1 %in% c(keep,p))]
-      pknotstar<-pknotstar[pknotstar>(p-step1*3) & pknotstar<(p+step1*3)]
-      knotstar<-sort(c(keep, p))
+      # pick a new location
+      p <- sample(potentialLocations,1)
+      # get the new knots
+      knotstar <- sort(c(keep, p))
       knotstar.b<-range(knotstar)
       knotstar.i<-knotstar[!(knotstar %in% knotstar.b)]
-      #Calculate spline transformation of dropout time and proposed X matrix and residuals
-      Xstar<-ns(u[group==1], knots=knotstar.i, Boundary.knots=knotstar.b, intercept=T)*t[group==1]
-      ystar<-as.vector(y[group==1]-bt[i-1]-Xstar%*%ct.g1[[i]]-rep(B1[group.u==1],nobs[group.u==1])-t[group==1]*rep(B2[group.u==1],nobs[group.u==1])-C[group==1,]%*%covar[i-1,])
-      yt<-as.vector(y[group==1]-bt[i-1]-Xt.g1%*%ct.g1[[i]]-rep(B1[group.u==1],nobs[group.u==1])-t[group==1]*rep(B2[group.u==1],nobs[group.u==1])-C[group==1,]%*%covar[i-1,])
+      # Calculate spline transformation of dropout time and proposed X matrix and residuals
+      Xstar<-cbind(
+        rep(1, nrow(data)),
+        ns(data[,dropoutTimes], knots=knotstar.i, Boundary.knots=knotstar.b, intercept=T)*t[group==1]
+      )
+
+      #Calculate residuals for likelihood ratio
+      if (!is.na(covariates)) {
+        LRresid.star <- as.vector(y - Xstar %*% modelIteration.current$Theta - 
+                                    as.matrix(data[,covariates]) %*% modelIteration.current$betaC -
+                                    Z %*% modelIteration.current$alpha
+        )
+        LRresid.prev <- as.vector(y - XPrev %*% modelIteration.current$Theta - 
+                                    as.matrix(data[,covariates]) %*% modelIteration.current$betaC -
+                                    Z %*% modelIteration.current$alpha
+        )
+      } else {
+        LRresid.star <-as.vector(y - Xstar %*% Theta.star - Z %*% modelIteration.current$alpha)
+        LRresid.prev <- as.vector(y - XPrev %*% modelIteration.current$Theta - Z %*% modelIteration.current$alpha)
+      }
+      
+      
       #Calculate the acceptance probability
-      rho<-log(length(potentialknots))-log(length(pknotstar))+(crossprod(yt)-crossprod(ystar))/2/sig[i-1]
-      if(rho>log(runif(1))){interior.g1[[i]]<-knotstar.i
+      rho <- log(length(potentialknots)) - log(length(pknotstar)) + 
+        (crossprod(LRresid.prev)-crossprod(LRresid.star))/2/modelIteration.current$prior.sigmaE
+      if (rho > log(runif(1))) {
+        return (knotstar, Xstar, true, true)
+        interior.g1[[i]]<-knotstar.i
                             boundary.g1[i,]<-knotstar.b
                             Xt.g1<-Xstar
                             accept.move.1<-accept.move.1+1
+      } else {
+        return (knots, Xprev, true, false)
       }
     } else {
       # nowhere to move to
-      return (knots, false, false)
+      return (knots, Xprev, false, false)
     }
   } else if (length(knots) == 1) {
     
@@ -338,14 +357,16 @@ moveKnot <- function(data, group, outcomes, treatment, covariates, dropoutTimes,
     potentialLocations.star <- potentialLocations.star[potentialLocations.star > (index - knots.options$stepSize[[group]]) & 
                                                          potentialLocations.star < (index + knots.options$stepSize[[group]])] 
     
+    Xstar<-cbind(rep(1, nrow(data)), data[,times])
+    
     rho <- log(length(potentialLocations)) - log(length(potentialLocations.star))
     if (rho > log(runif(1))) {
-      return (sort(knotsToKeep, p), true, true)
+      return (c(p), Xstar, true, true)
     } else {
-      return (sort(knotsToKeep, p), true, false)
+      return (knots, Xprev, true, false)
     }
   } else {
-    return (NA, false, false)
+    return (knots, Xprev, false, false)
   }
   
 }
@@ -359,7 +380,11 @@ moveKnot <- function(data, group, outcomes, treatment, covariates, dropoutTimes,
 #' @examples
 #' add(1, 1)
 #' add(10, 1)
-updateFixedEffects <- function() {
+updateFixedEffects <- function(data, group, outcomes, treatment, covariates, dropoutTimes, 
+                               times, modelIteration.previous, X.prev, knots.options,
+                               prior.options) {
+  
+  
   R0<-diag(rep(sig.beta, ((nknots.g1[i]+1)))) #Prior Variance
   yt<-y[group==1]-rep(B1[group.u==1],nobs[group.u==1])-t[group==1]*rep(B2[group.u==1],nobs[group.u==1])-C[group==1,]%*%covar[i-1,]   # Y - random effects
   mnt<-ginv(ginv(R0)+(1/sig[i-1])*crossprod(cbind(one[group==1],Xt.g1)))%*%(crossprod(cbind(one[group==1],Xt.g1),yt))*(1/sig[i-1]) #WLSP Mean
@@ -412,7 +437,9 @@ updateFixedEffectsCovariates <- function() {
 #' @examples
 #' add(1, 1)
 #' add(10, 1)
-updateRandomEffects <- function() {
+updateRandomEffects <- function(data, group, outcomes, treatment, covariates, dropoutTimes, 
+                                times, modelIteration.previous, X.prev, knots.options,
+                                prior.options) {
   # Update b2|b1
   
   vb<-1/(tau21+tau*tapply(t^2,patid,sum))
@@ -435,8 +462,19 @@ updateRandomEffects <- function() {
 #' add(1, 1)
 #' add(10, 1)
 #' 
-updateCovarianceParameters <- function() {
+updateCovarianceParameters <- function(data, group, outcomes, treatment, covariates, dropoutTimes, 
+                                       times, modelIteration.previous, X.prev, knots.options,
+                                       prior.options) {
   # Update tau  
+  # get the current residual
+  if (!is.na(covariates)) {
+    yt <-as.vector(y - Z %*% modelIteration.previous$alpha - 
+                      as.matrix(data[,covariates]) %*% modelIteration.previous$betaC)
+  } else {
+    yt <-as.vector(y - Z %*% modelIteration.previous$alpha)
+  }
+  
+  
   yt<-y-rep(B1,nobs)-t*rep(B2,nobs)-bt[i]-C%*%covar[i,]
   yt[group==1]<-yt[group==1]-Xt.g1%*%as.vector(ct.g1[[i]])
   yt[group==2]<-yt[group==2]-Xt.g2%*%as.vector(ct.g2[[i]])-hardeffect.g1[i]*hard[group==2]
