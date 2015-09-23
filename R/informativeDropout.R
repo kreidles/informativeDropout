@@ -31,9 +31,9 @@ modelIteration <- function(knots=NULL, X=NULL, ) {
     beta0=NULL,
     Theta=NULL,
     knotAdded = FALSE,
-    betaC = NULL,
+    betaCovariate = NULL,
     proposed=list(knot.add=FALSE, knot.remove=FALSE, knot.move=FALSE,
-                  fixedEffects=FALSE, randomEffects=FALSE, varianceComponents=FALSE)
+                  fixedEffects=FALSE, randomEffects=FALSE, varianceComponents=FALSE),
     accepted=list(knot.add=FALSE, knot.remove=FALSE, knot.move=FALSE,
                     fixedEffects=FALSE, randomEffects=FALSE, varianceComponents=FALSE)
     
@@ -273,35 +273,29 @@ moveKnot <- function(data, group, outcomes, treatment, covariates, dropoutTimes,
                      times, modelIteration.current, X.prev, knots.options,
                      prior.options) {
   
-  knots <- modelIteration.current$knots
+  knots <- modelIteration.current$knots[[group]]
   
-  # If nknots>2, propose to move interior knot 
-  if (length(knots) > 1) {
+  #Pick a knot to move 
+  knotToMove <- sample(knots, 1) 
+  # get index of knot to be moved
+  index <- which(knots == knotToMove) 
+  # get the knots that are staying in the same place
+  knotsToKeep <- knots[-index] 
+  
+  # find a new location from the potential knot locations
+  potentialLocations <- knots.options$candidatePositions[!(knots.options$candidatePositions %in% knots)]
+  # here we only allow movement within some small window
+  potentialLocations <- potentialLocations[potentialLocations > (index - knots.options$stepSize[[group]]) & 
+                                             potentialLocations < (index + knots.options$stepSize[[group]])] 
+  
+  
+  if (length(potentialLocations > 0)) {
+    # pick a new location
+    p <- sample(potentialLocations,1)
+    # get the new knots
+    knotstar <- sort(c(knotsToKeep, p))
     
-    # get boundaries and interior
-    knots.boundary = range(knots)
-    knots.interior = knots[-c(1,length(knots))] 
-    
-    #knots can only move to open bins between adjacent knots
-    #Pick a knot to move: 
-    knotToMove <- sample(knots, 1) 
-    # get index of knot to be moved
-    index <- which(knots == knotToMove) 
-    # get the knots that are staying in the same place
-    knotsToKeep <- knots[-index] 
-    
-    # find a new location from the potential knot locations
-    potentialLocations <- knots.options$candidatePositions[!(knots.options$candidatePositions %in% knots)]
-    # here we only allow movement within some small window
-    potentialLocations <- potentialLocations[potentialLocations > (index - knots.options$stepSize[[group]]) & 
-                                               potentialLocations < (index + knots.options$stepSize[[group]])] 
-    
-    
-    if (length(potentialLocations > 0)) {
-      # pick a new location
-      p <- sample(potentialLocations,1)
-      # get the new knots
-      knotstar <- sort(c(keep, p))
+    if (length(knotstar) > 1) {
       knotstar.b<-range(knotstar)
       knotstar.i<-knotstar[!(knotstar %in% knotstar.b)]
       # Calculate spline transformation of dropout time and proposed X matrix and residuals
@@ -309,63 +303,35 @@ moveKnot <- function(data, group, outcomes, treatment, covariates, dropoutTimes,
         rep(1, nrow(data)),
         ns(data[,dropoutTimes], knots=knotstar.i, Boundary.knots=knotstar.b, intercept=T)*t[group==1]
       )
-
-      #Calculate residuals for likelihood ratio
-      if (!is.na(covariates)) {
-        LRresid.star <- as.vector(y - Xstar %*% modelIteration.current$Theta - 
-                                    as.matrix(data[,covariates]) %*% modelIteration.current$betaC -
-                                    Z %*% modelIteration.current$alpha
-        )
-        LRresid.prev <- as.vector(y - XPrev %*% modelIteration.current$Theta - 
-                                    as.matrix(data[,covariates]) %*% modelIteration.current$betaC -
-                                    Z %*% modelIteration.current$alpha
-        )
-      } else {
-        LRresid.star <-as.vector(y - Xstar %*% Theta.star - Z %*% modelIteration.current$alpha)
-        LRresid.prev <- as.vector(y - XPrev %*% modelIteration.current$Theta - Z %*% modelIteration.current$alpha)
-      }
-      
-      
-      #Calculate the acceptance probability
-      rho <- log(length(potentialknots)) - log(length(pknotstar)) + 
-        (crossprod(LRresid.prev)-crossprod(LRresid.star))/2/modelIteration.current$prior.sigmaE
-      if (rho > log(runif(1))) {
-        return (knotstar, Xstar, true, true)
-        interior.g1[[i]]<-knotstar.i
-                            boundary.g1[i,]<-knotstar.b
-                            Xt.g1<-Xstar
-                            accept.move.1<-accept.move.1+1
-      } else {
-        return (knots, Xprev, true, false)
-      }
     } else {
-      # nowhere to move to
-      return (knots, Xprev, false, false)
+      Xstar<-cbind(rep(1, nrow(data)), data[,times])
     }
-  } else if (length(knots) == 1) {
     
-    # find a new location from the potential knot locations
-    #     potentialknots<-candidates.g1[(candidates.g1 != boundary.g1[i,1])]
-    potentialLocations <- knots.options$candidatePositions[knots.options$candidatePositions != knotToMove]
-    # here we only allow movement within some small window
-    potentialLocations <- potentialLocations[potentialLocations > (index - knots.options$stepSize[[group]]) & 
-                                               potentialLocations < (index + knots.options$stepSize[[group]])] 
-    # get the new location
-    p <- sample(potentialLocations, 1)  
+    #Calculate residuals for likelihood ratio
+    if (!is.na(covariates)) {
+      LRresid.star <- as.vector(y - Xstar %*% modelIteration.current$Theta - 
+                                  as.matrix(data[,covariates]) %*% modelIteration.current$betaC -
+                                  Z %*% modelIteration.current$alpha
+      )
+      LRresid.prev <- as.vector(y - XPrev %*% modelIteration.current$Theta - 
+                                  as.matrix(data[,covariates]) %*% modelIteration.current$betaC -
+                                  Z %*% modelIteration.current$alpha
+      )
+    } else {
+      LRresid.star <-as.vector(y - Xstar %*% Theta.star - Z %*% modelIteration.current$alpha)
+      LRresid.prev <- as.vector(y - XPrev %*% modelIteration.current$Theta - Z %*% modelIteration.current$alpha)
+    }
     
-    potentialLocations.star <- knots.options$candidatePositions[(knots.options$candidatePositions != p)]
-    potentialLocations.star <- potentialLocations.star[potentialLocations.star > (index - knots.options$stepSize[[group]]) & 
-                                                         potentialLocations.star < (index + knots.options$stepSize[[group]])] 
-    
-    Xstar<-cbind(rep(1, nrow(data)), data[,times])
-    
-    rho <- log(length(potentialLocations)) - log(length(potentialLocations.star))
+    #Calculate the acceptance probability
+    rho <- log(length(potentialknots)) - log(length(pknotstar)) + 
+      (crossprod(LRresid.prev)-crossprod(LRresid.star))/2/modelIteration.current$prior.sigmaE
     if (rho > log(runif(1))) {
-      return (c(p), Xstar, true, true)
+      return (knotstar, Xstar, true, true)
     } else {
       return (knots, Xprev, true, false)
     }
   } else {
+    # nowhere to move to
     return (knots, Xprev, false, false)
   }
   
@@ -381,50 +347,119 @@ moveKnot <- function(data, group, outcomes, treatment, covariates, dropoutTimes,
 #' add(1, 1)
 #' add(10, 1)
 updateFixedEffects <- function(data, group, outcomes, treatment, covariates, dropoutTimes, 
-                               times, modelIteration.previous, X.prev, knots.options,
+                               times, modelIteration.current, X.prev, knots.options,
                                prior.options) {
   
+  knots <- modelIteration.current$knots[[group]]
+  sigmaBeta <- modelIteration.current$prior.sigmaBeta
+  Xprev <- X.prev[[group]]
+  ThetaPrev <- modelIteration.current$Theta[[group]]
   
-  R0<-diag(rep(sig.beta, ((nknots.g1[i]+1)))) #Prior Variance
-  yt<-y[group==1]-rep(B1[group.u==1],nobs[group.u==1])-t[group==1]*rep(B2[group.u==1],nobs[group.u==1])-C[group==1,]%*%covar[i-1,]   # Y - random effects
-  mnt<-ginv(ginv(R0)+(1/sig[i-1])*crossprod(cbind(one[group==1],Xt.g1)))%*%(crossprod(cbind(one[group==1],Xt.g1),yt))*(1/sig[i-1]) #WLSP Mean
-  covt<-ginv(ginv(R0)+(1/sig[i-1])*crossprod(cbind(one[group==1],Xt.g1))) #WLSP Cov
-  covt<-vs*covt # Scale Cov to adjust acceptance rate
-  covt<-as.matrix(nearPD(covt)$mat) #Ensure Cov is PD
-  pbeta<-rmvnorm(1, mnt, covt) #Draw proposal
-  #Calculate residuals for likelihood ratio
-  ystar<-yt-tcrossprod(cbind(one[group==1],Xt.g1),pbeta)
-  yt<-yt-cbind(one[group==1],Xt.g1)%*%c(bt[i-1], ct.g1[[i]])
-  #Calculate acceptance prob
-  rho<-log(dmvnorm(c(bt[i-1], ct.g1[[i]]), mnt,covt))-log(dmvnorm(pbeta, mnt,covt))+(crossprod(c(bt[i-1], ct.g1[[i]]))-tcrossprod(pbeta))/2/sig.beta+(crossprod(yt)-crossprod(ystar))/2/sig[i-1]
-  
-  if(rho>log(runif(1))){bt[i]<-pbeta[1]
-                        ct.g1[[i]]<-pbeta[2:(nknots.g1[i]+1)]
-                        accept.betas1<-accept.betas1+1
-  }else{bt[i]<-bt[i-1]
+  # create the covariance matrix for the intercept and theta coefficients for the splines - R0
+  covarIntTheta <- diag(rep(sigmaBeta, (length(knots)+1))) 
+  covarIntThetaInverse <- diag(rep(1/sigmaBeta, (length(knots)+1))) 
+  # Calculate residuals 
+  if (!is.na(covariates)) {
+    LRresid <- as.vector(y - X.prev %*% modelIteration.current$Theta - 
+                                as.matrix(data[,covariates]) %*% modelIteration.current$betaC -
+                                Z %*% modelIteration.current$alpha
+    )
+  } else {
+    LRresid <-as.vector(y - X.prev %*% Theta.star - Z %*% modelIteration.current$alpha)
   }
   
+  # calculate the covariance and mean of the proposal distribution
+  proposedCovariance <- ginv(covarIntThetaInverse + (1/sigmaBeta) * crossprod(Xprev))
+  proposedMean <- proposedCovariance %*% ((1/sigmaBeta) * crossprod(Xprev, LRresid))
+
+  # Scale Cov to adjust acceptance rate
+  proposedCovariance <- mcmc.options$fixedEffectAcceptRateAdjust * proposedCovariance 
+  
+  # ensure the covariance is positive definite
+  proposedCovariance <- as.matrix(nearPD(proposedCovariance)$mat) 
+  # draw a proposed set of coefficients
+  ThetaStar <- rmvnorm(1, proposedMean, proposedCovariance) 
+  
+  # Calculate residuals for likelihood ratio
+  residStar <- LRresid - crossprod(Xprev, ThetaStar)
+  residPrev <- LRresid - crossprod(Xprev, ThetaPrev)
+
+  # Calculate acceptance probability
+  rho <- log(dmvnorm(ThetaPrev, proposedMean, proposedCovariance)) - 
+    log(dmvnorm(ThetaStar, proposedMean, proposedCovariance)) + 
+    (crossprod(ThetaPrev)-tcrossprod(ThetaStar))/(2 * sigmabeta) + 
+    (crossprod(residPrev)-crossprod(residStar))/(2 * sigmaBeta)
+  
+  if (rho > log(runif(1))) {
+    return (ThetaStar, TRUE, TRUE)
+  } else {
+    return (ThetaPrev, TRUE, FALSE)
+  }
 }
 
+#'
+#'
+#'
+#'
+#'
+#'
+#'
+updateFixedEffectsCovariates <- function(data, outcomes, treatment, covariates, dropoutTimes, 
+                                         times, modelIteration.current, X.prev, knots.options,
+                                         prior.options) {
+  sigmaBeta <- modelIteration.current$prior.sigmaBeta
+  
+  # subtract the fixed effects for each group
+  groupList <- unique(data[,treatment])
+  
+  residuals = vector(0)
+  covariatesByGroup = NULL
+  for(group in groupList) {
+    dataGroup <- data[data[,treatment] == group,]
+    yGroup <- dataGroup[,treatment]
+    covarGroup <- dataGroup[,covariates]
+    Z = cbind(rep(1,nrow(dataGroup)), dataGroup[,times])
+    
+    residualsGroup <- yGroup - Z %*% modelIteration.previous$alpha - X.prev[[group]] %*% ThetaPrev
+    residuals <- c(residuals, residualsGroup) 
+    if (is.null(covarByGroup)) {
+      covariatesByGroup = covarGroup
+    } else {
+      covariatesByGroup <- rbind(covariatesByGroup, covarGroup)
+    }
+  }
+  
+  covarIntThetaInverse <- diag(rep(1/sigmaBeta, length(covariates))) 
+  
+  proposedCovariance <- ginv(covarIntThetaInverse + (1/sigmaBeta) * t(covariatesByGroup) %*% covariatesByGroup)
+  proposedMean <- proposedCovariance %*% ((1/sigmaBeta) * t(covariatesByGroup) %*% residuals)
+  
+  # Scale Cov to adjust acceptance rate
+  proposedCovariance <- mcmc.options$fixedEffectAcceptRateAdjust * proposedCovariance 
+  
+  # ensure the covariance is positive definite
+  proposedCovariance <- as.matrix(nearPD(proposedCovariance)$mat) 
 
-updateFixedEffectsCovariates <- function() {
-  R0<-diag(rep(100, (ncovar))) #prior variance
-  yt<-y-rep(B1,nobs)-t*rep(B2,nobs)
-  yt[group==1]<-yt[group==1]-bt[i]-Xt.g1%*%as.vector(ct.g1[[i]])
-  yt[group==2]<-yt[group==2]-bt[i]-hardeffect.g1[i]-Xt.g2%*%as.vector(ct.g2[[i]])
-  mnt<-ginv(ginv(R0)+(1/sig[i-1])*t(cbind(C))%*%cbind(C))%*%(t(cbind(C))%*%yt)*(1/sig[i-1])
-  covt<-ginv(ginv(R0)+(1/sig[i-1])*t(cbind(C))%*%cbind(C))
-  covt<-vs*covt
-  covt<-as.matrix(nearPD(covt)$mat)
-  pbeta<-rmvnorm(1, mnt, covt)
-  ystar<-yt-cbind(C)%*%t(pbeta)
-  yt<-yt-cbind(C)%*%c(covar[i-1,])
-  rho<-sum(log(dnorm(ystar, 0, sqrt(sig[i-1]))))+log(dmvnorm(pbeta, rep(0, (ncovar)),R0))+log(dmvnorm(c(covar[i-1,]), mnt,covt)) - sum(log(dnorm(yt, 0, sqrt(sig[i-1]))))-log(dmvnorm(c(covar[i-1,]), rep(0, (ncovar)),R0))-log(dmvnorm(pbeta, mnt,covt))
-  if(rho>log(runif(1))){
-    covar[i,]<-pbeta
-    accept.covar<-accept.covar+1
-  }else{
-    covar[i,]<-covar[i-1,]}
+  # draw a proposed set of coefficients for the covariates
+  betaCovariateStar <- rmvnorm(1, proposedMean, proposedCovariance)
+  
+  # calculate the residuals
+  residualStar <- residuals - covariatesByGroup %*% t(betaCovariateStar)
+  residualPrev <- residuals - covariatesByGroup %*% t(modelIteration.current$betaCovariate)
+  
+  # calculate the acceptance probability
+  rho<-sum(log(dnorm(residualStar, 0, sqrt(sigmaBeta)))) + 
+    log(dmvnorm(betaCovariateStar, rep(0, length(covariates)), covarIntThetaInverse)) + 
+    log(dmvnorm(modelIteration.current$betaCovariate, proposedMean, proposedCovariance)) - 
+    sum(log(dnorm(yt, 0, sqrt(sig[i-1])))) - 
+    log(dmvnorm(modelIteration.current$betaCovariate, rep(0, length(covariates)), covarIntThetaInverse)) - 
+    log(dmvnorm(betaCovariateStar, proposedMean, proposedCovariance))
+  
+  if (rho > log(runif(1))) {
+    return (betaCovariateStar, TRUE, TRUE)
+  } else {
+    return (modelIteration.current$betaCovariate, TRUE, FALSE)
+  }
 }
 
 
