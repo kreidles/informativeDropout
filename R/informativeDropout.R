@@ -32,11 +32,24 @@ modelIteration <- function(knots=NULL, X=NULL, ) {
     Theta=NULL,
     knotAdded = FALSE,
     betaCovariate = NULL,
+    
+    # residual error variance
+    sigma.error = 1,
+    # variance / covariance of the random effects
+    sigma.randomIntercept = 1,
+    sigma.randomSlope = 1,
+    sigma.randomInterceptSlope = 0,
+    
+    # Poisson parameters for the number of knots, D, where D ~ Poisson(lambda)
+    lambda.numKnots = 1,
+    
+    # variance of the regression coefficients (assumes equal variance of each coefficient)
+    sigma.beta = 1,
+    
     proposed=list(knot.add=FALSE, knot.remove=FALSE, knot.move=FALSE,
                   fixedEffects=FALSE, randomEffects=FALSE, varianceComponents=FALSE),
     accepted=list(knot.add=FALSE, knot.remove=FALSE, knot.move=FALSE,
-                    fixedEffects=FALSE, randomEffects=FALSE, varianceComponents=FALSE)
-    
+                  fixedEffects=FALSE, randomEffects=FALSE, varianceComponents=FALSE)
   )
   
   class(mi) <- append(class(mi), "modelIteration")
@@ -472,19 +485,59 @@ updateFixedEffectsCovariates <- function(data, outcomes, treatment, covariates, 
 #' @examples
 #' add(1, 1)
 #' add(10, 1)
-updateRandomEffects <- function(data, group, outcomes, treatment, covariates, dropoutTimes, 
-                                times, modelIteration.previous, X.prev, knots.options,
+updateRandomEffects <- function(data, id, group, outcomes, treatment, covariates, dropoutTimes, 
+                                times, modelIteration, X.prev, knots.options,
                                 prior.options) {
-  # Update b2|b1
   
-  vb<-1/(tau21+tau*tapply(t^2,patid,sum))
-  mb0<-rhob*sqrt(sigmab2/sigmab1)*B1     # Conditional Prior Mean of b2|b1
+  # get number of observations per independent sampling unit
+  nobs <- as.vector(table(data[,id]))
+  numSubjects <- length(unique(data[,id]))
+  
+  # calculate rho
+  rho = (modelIteration$sigma.randomInterceptSlope / 
+           sqrt(modelIteration$sigmaSq.randomIntercept *
+              modelIteration$sigmaSq.randomSlope))
+  
+  # some convenience variables
+  tau.error = 1 / modelInteration$sigmaSq.error
+  tau.randomIntercept = 1 / modelInteration$sigmaSq.randomIntercept
+  tau.randomSlope = 1 / modelInteration$sigmaSq.randomSlope
+  tau.randomInterceptSlope = 1 / modelInteration$sigma.randomInterceptSlope
+  
+  # calculate the residuals - FIX ME!!!
+  yt<-y-t*rep(B2,nobs)-bt[i]-C%*%covar[i,]
+  yt[group==1]<-yt[group==1]-Xt.g1%*%as.vector(ct.g1[[i]])
+  yt[group==2]<-yt[group==2]-hardeffect.g1[i]*hard[group==2]-Xt.g2%*%as.vector(ct.g2[[i]])
+  
+  # get the conditional distribution of the random intercept
+  variance.randomIntercept <- 1 / (tau.error * nobs + tau.randomIntercept * (1 - rho*rho))
+  mean.randomIntercept <- (variance.randomIntercept * 
+                             (tau.error * tapply(residuals,patid,sum) + 
+                                modelIteration$alpha.intercept * (rho / (1 - rho*rho)) * 
+                                (1 / sqrt(modelInteration$sigmaSq.randomIntercept * 
+                                            modelInteration$sigmaSq.randomSlope))))
+  # draw a new random effect sample
+  randomIntercepts <-rnorm(numSubjects, mean.randomIntercept, sqrt(variance.randomIntercept))
+  
+  
+  # get the conditional distribution of the random slope -- FIX RESIDUALS!
   yt<-y-rep(B1,nobs)-bt[i]-C%*%covar[i,]
   yt[group==1]<-yt[group==1]-Xt.g1%*%as.vector(ct.g1[[i]])
   yt[group==2]<-yt[group==2]-hardeffect.g1[i]*hard[group==2]-Xt.g2%*%as.vector(ct.g2[[i]])
-  mb<-vb*(tau21*mb0+tau*tapply(t*(yt),patid,sum)) 
-  B2<-rnorm(nsub,mb,sqrt(vb))
   
+  times <- data[,times]
+  variance.randomSlope <- 1 / (tau.error * tapply(times^2, id, sum) + tau.randomSlope * (1 - rho*rho))
+  mean.randomSlope <- (variance.randomSlope * 
+                         (tau.error * tapply(times*residuals,patid,sum) + 
+                            modelIteration$alpha.intercept * (rho / (1 - rho*rho)) * 
+                            (1 / sqrt(modelInteration$sigmaSq.randomIntercept * 
+                                        modelInteration$sigmaSq.randomSlope))))
+  
+
+  randomSlopes <-rnorm(numSubjects, mean.randomSlope, sqrt(variance.randomSlope))
+  
+  return (data.frame(randomIntercepts = randomIntercepts, randomSlopes = randomSlopes))
+
 }
 
 #' Add a new knot and use a Metropolis-Hastings step
@@ -540,7 +593,7 @@ updateCovarianceParameters <- function(data, group, outcomes, treatment, covaria
 #'
 #'
 #'
-_informativeDropout.bayesian.gaussian <- function(data, treatment, covariates, dropoutTimes, 
+informativeDropout.bayesian.gaussian <- function(data, treatment, covariates, dropoutTimes, 
                                                   times, knots.options, mcmc.options) {
   
   
@@ -557,7 +610,7 @@ _informativeDropout.bayesian.gaussian <- function(data, treatment, covariates, d
     for (group in groupList) {
       groupData = data[data[,treatment] == group]
       # randomly decide to add/remove a knot
-      if (runif(1) < knots.options$birthProbability && ) {
+      if (runif(1) < knots.options$birthProbability) {
         modelIteration.current = addKnot(modelIteration.previous, knots.options)
       } else {
         modelIteration.current = removeKnot(modelIteration.previous, knots.options)                 
@@ -586,7 +639,7 @@ _informativeDropout.bayesian.gaussian <- function(data, treatment, covariates, d
   
   
   # return the estimates, with distributions, and the model results from each iteration
-  return model.fit
+  return (model.fit)
   
 }
 
@@ -598,11 +651,12 @@ _informativeDropout.bayesian.gaussian <- function(data, treatment, covariates, d
 #' @examples
 #' add(1, 1)
 #' add(10, 1)
-informativeDropout <- function(data, treatment, covariates, dropoutTimes, times,
+informativeDropout <- function(data, id, treatment, covariates, dropoutTimes, times,
                                method="bayesian", dist="normal",
                                knots.options=list(birthProbability=0.5, min=3, max=10, 
                                                   startPositions=NULL, candidatePositions=NULL), 
-                               mcmc.options=(iterations=100000,burnIn=50000)) {
+                               mcmc.options=list(iterations=100000, burnIn=50000),
+                               prior.options=list(foo=1)) {
   
   #
   
