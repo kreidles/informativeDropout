@@ -22,14 +22,32 @@
 #
 #####################################################################
 
+#'
+#' A class describing a bayesian spline fit.  Includes the
+#' parameter estimates and iteration summary
+#' 
+#'
+
+#'
+#' A class descirbing a bayesian dirichlet process fit.
+#'
+#'
+#'
+
+#'
+#'A class describing a mixed model fit 
+#'
+
+
 #' A class containing the current state of the model
 #' during a RJMCMC run
 #'
-modelIteration <- function(knots=NULL, X=NULL, ) {
+informativeDropout.iteration <- function(knots=NULL, X=NULL, ) {
   mi = list(
     knots = knots,
     beta0=NULL,
     Theta=NULL,
+    alpha=NULL,
     knotAdded = FALSE,
     betaCovariate = NULL,
     
@@ -46,17 +64,19 @@ modelIteration <- function(knots=NULL, X=NULL, ) {
     # variance of the regression coefficients (assumes equal variance of each coefficient)
     sigma.beta = 1,
     
+    shape.tau = 0.001,
+    rate.tau = 0.001,
+    
     proposed=list(knot.add=FALSE, knot.remove=FALSE, knot.move=FALSE,
                   fixedEffects=FALSE, randomEffects=FALSE, varianceComponents=FALSE),
     accepted=list(knot.add=FALSE, knot.remove=FALSE, knot.move=FALSE,
                   fixedEffects=FALSE, randomEffects=FALSE, varianceComponents=FALSE)
   )
   
-  class(mi) <- append(class(mi), "modelIteration")
+  class(mi) <- append(class(mi), "informativeDropout.iteration")
   return(mi)
   
 }
-
 
 #' Add a new knot and use a Metropolis-Hastings step
 #' to determine if we keep the changes to the model
@@ -70,40 +90,6 @@ modelIteration <- function(knots=NULL, X=NULL, ) {
 addKnot <- function(data, group, outcomes, treatment, covariates, dropoutTimes, 
                     times, modelIteration.previous, X.prev, knots.options,
                     prior.options) {
-  
-  #   ### remove debugging
-  #   data=dat[data$hard==1,]
-  #   group="1"
-  #   outcomes="logcd4"
-  #   treatment="hard"
-  #   covariates=NA
-  #   dropoutTimes="drop"
-  #   times = "years"
-  #   
-  #   knots.options=list(
-  #     candidatePositions = candidates.g1,
-  #     
-  #     min=3, max=10
-  #   )
-  #   
-  #   modelIteration.previous = list(
-  #     knots = currentknots.g1,
-  #     alpha = c(0, 1),
-  #     beta.covar = NA,
-  #     Theta = list("1"=(Theta.LSXprev + rnorm(1)))
-  #   )
-  #   
-  #   prior.options = list(sigmaError=1.25^2)
-  #   
-  #   knots.boundary = range(modelIteration.previous$knots)
-  #   knots.interior = modelIteration.previous$knots[-c(1,length(modelIteration.previous$knots))] 
-  #   
-  #   Xprev = cbind(
-  #     rep(1,nrow(data)),
-  #     ns(data[,dropoutTimes], knots=knots.interior, Boundary.knots=knots.boundary, intercept=T) * data[,times]
-  #   )
-  #   ### END DEBUG
-  #   
   
   # add a knot by randomly selecting a candidate knot
   index = sample(1:length(knots.options$candidatePositions), 1)
@@ -551,34 +537,38 @@ updateRandomEffects <- function(data, id, group, outcomes, treatment, covariates
 #' add(10, 1)
 #' 
 updateCovarianceParameters <- function(data, group, outcomes, treatment, covariates, dropoutTimes, 
-                                       times, modelIteration.previous, X.prev, knots.options,
+                                       times, modelIteration, X.prev, knots.options,
                                        prior.options) {
-  # Update tau  
-  # get the current residual
-  if (!is.na(covariates)) {
-    yt <-as.vector(y - Z %*% modelIteration.previous$alpha - 
-                      as.matrix(data[,covariates]) %*% modelIteration.previous$betaC)
-  } else {
-    yt <-as.vector(y - Z %*% modelIteration.previous$alpha)
+  # calculate the residuals
+  residuals = vector(0)
+  for(group in groupList) {
+    dataGroup <- data[data[,treatment] == group,]
+    yGroup <- dataGroup[,treatment]
+    covarGroup <- dataGroup[,covariates]
+    Z = cbind(rep(1,nrow(dataGroup)), dataGroup[,times])
+    
+    residualsGroup <- yGroup - Z %*% modelIteration$alpha - X.prev[[group]] %*% modelIteration$Theta
+    if (!is.null(covariates)) {
+      residualsGroup <- residualsGroup - dataGroup[,covariates] %*% modelIteration$betaCovariates
+    }
+    residuals <- c(residuals, residualsGroup) 
   }
   
+  # sample from an inverse Gamma to update sigma.error
+  shape <- modelIteration$shape.tau + (nrow(data) / 2) 
+  rate <- modelIteration$rate.tau + (crossprod(residuals) / 2)
+  modelIteration$sigma.error <- 1 / rgamma(1, shape, rate)
   
-  yt<-y-rep(B1,nobs)-t*rep(B2,nobs)-bt[i]-C%*%covar[i,]
-  yt[group==1]<-yt[group==1]-Xt.g1%*%as.vector(ct.g1[[i]])
-  yt[group==2]<-yt[group==2]-Xt.g2%*%as.vector(ct.g2[[i]])-hardeffect.g1[i]*hard[group==2]
-  g<-g0+crossprod(yt)/2
-  taus[i]<-tau<-rgamma(1,d0+N/2,g)
-  sig[i]<-1/taus[i]
+  # sample from an inverse wishart to update the covariance of the random effects
+  nobs <- as.vector(table(data[,id]))
+  numSubjects <- length(unique(data[,id]))
+  sigma.alpha <- riwish(prior.options$sigmaError.df + numSubjects, 
+                        prior.options$sigmaError.scaleMatrix + crossprod(as.matrix(modelIteration$alpha)))
   
-  # Update Sigma.b  
-  bmat<-cbind(B1,B2)            
-  Sigma.b<-riwish(nu0+nsub,c0+crossprod(bmat))
-  sigmab1<-Sigma.b[1,1]                    # Marginal variance of b1
-  sigmab2<-Sigma.b[2,2]                    # Marginal variance of b2
-  rhob<-Sigma.b[1,2]/sqrt(sigmab1*sigmab2) # Corr(b1,b2)
-  tau12<-1/(sigmab1*(1-rhob^2))            # Conditional precision of b1|b2
-  tau21<-1/(sigmab2*(1-rhob^2))            # Conditional precision of b2|b1
-  Sigma.bs[i,]<-c(Sigma.b)   
+  sigma.randomIntercept = sigma.alpha[1,1]
+  sigma.randomSlope = sigma.alpha[2,2]
+  sigma.randomInterceptSlope = sigma.alpha[1,2]
+  
 }
 
 #
@@ -593,8 +583,8 @@ updateCovarianceParameters <- function(data, group, outcomes, treatment, covaria
 #'
 #'
 #'
-informativeDropout.bayesian.gaussian <- function(data, treatment, covariates, dropoutTimes, 
-                                                  times, knots.options, mcmc.options) {
+informativeDropout.bayesian.splines <- function(data, treatment, covariates, dropoutTimes, 
+                                                times, knots.options, mcmc.options) {
   
   
   groupList <- unique(data$treatment)
@@ -649,25 +639,35 @@ informativeDropout.bayesian.gaussian <- function(data, treatment, covariates, dr
 #' @param y A number.
 #' @return The sum of \code{x} and \code{y}.
 #' @examples
-#' add(1, 1)
-#' add(10, 1)
-informativeDropout <- function(data, id, treatment, covariates, dropoutTimes, times,
-                               method="bayesian", dist="normal",
+#' 
+informativeDropout <- function(data, id, group, covariates, times.dropout, times.observation,
+                               method="bayes.splines", dist="normal",
                                knots.options=list(birthProbability=0.5, min=3, max=10, 
                                                   startPositions=NULL, candidatePositions=NULL), 
                                mcmc.options=list(iterations=100000, burnIn=50000),
                                prior.options=list(foo=1)) {
   
-  #
-  
-  # return an informativeDropout.fit class
-  # split into either 
+  if (method == 'bayes.splines') {
+    # model the relationship between dropout time and slope using natural splines
+    return (informativeDropout.bayes.splines(data, id, group, covariates, 
+                                               times.dropout, times.observation, dist, 
+                                               knots.options, mcmc.options, prior.options))
+  } else if (method == 'bayes.dirichlet') {
+    # account for informative dropout using a dirichlet process 
+    return (informativeDropout.bayes.dirichlet(data, id, group, covariates, 
+                                                times.dropout, times.observation, dist, 
+                                                knots.options, mcmc.options, prior.options))
+  } else if (method == 'mixed') {
+    # fit a mixed model which models the relationship between dropout time and slope using natural splines
+    return (informativeDropout.mixed(data, id, group, covariates, 
+                                     times.dropout, times.observation, dist, 
+                                     knots.options, mcmc.options, prior.options))
+    
+  }
+
 }
 
 
-# functions
-# - summary: show estimates
-# - print
-# - predict: get distribution for 
+
 
 
