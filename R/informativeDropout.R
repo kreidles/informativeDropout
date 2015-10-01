@@ -22,6 +22,8 @@
 #
 #####################################################################
 
+library(matrixcalc)
+library(splines)
 #'
 #' A class describing a bayesian spline fit.  Includes the
 #' parameter estimates and iteration summary
@@ -675,9 +677,9 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes, groups, co
   # cache a few values we will use repeatedly
   cache = list(
     # number of subjects
-    numSubjects = length(unique(data[,id])),
+    numSubjects = length(unique(data[,ids.var])),
     # number of observations per subject
-    numObservations = as.vector(table(data[,id])),
+    numObservations = as.vector(table(data[,ids.var])),
     # number of subjects per group
     subjectsPerGroup = lapply(groupList, function(group) { 
       # get the covariates
@@ -724,8 +726,49 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes, groups, co
     }),
     
     # X matrix from the previous iteration, split by group
-    X = vector(mode = 'list', length(groupList))
+    X = lapply(groupList, function(group) { 
+      groupTimes = data[data[,groups] == group,times.observation]
+      groupDropout = data[data[,groups] == group,times.dropout]
+      knots.boundary = range(knots.options$startPositions)
+      knots.interior = knots.options$startPositions[-c(1,length(knots.options$startPositions))] 
+      return(as.matrix(cbind(
+        rep(1,length(groupTimes)),
+        ns(groupDropout, knots=knots.interior, Boundary.knots=knots.boundary, intercept=T) * groupTimes
+      )))
+    })
   )
+  
+  # get estimates for the initial regression coefficients
+  Xfull = NULL
+  CovarFull = NULL
+  OutcomesFull = NULL
+  for(i in 1:length(cache$X)) {
+    if (is.null(Xfull)) {
+      Xfull = cache$X[[i]]
+    } else {
+      Xfull <- rbind(Xfull, cache$X[[i]])
+    }
+    
+    if (is.null(CovarFull)) {
+      CovarFull = cache$covariates[[i]]
+    } else {
+      CovarFull <- rbind(CovarFull, cache$covariates[[i]])
+    }
+    
+    if (is.null(OutcomesFull)) {
+      OutcomesFull = cache$outcomes[[i]]
+    } else {
+      OutcomesFull <- c(OutcomesFull, cache$outcomes[[i]])
+    }
+  }
+  OutcomesFull <- as.data.frame(OutcomesFull)
+  names(OutcomesFull) <- outcomes
+  Xfull = as.data.frame(Xfull)
+  names(Xfull) <- sapply(0:(ncol(Xfull)-1), function(i) { return(paste("theta", i, sep=''))})
+  data.theta = cbind(OutcomesFull, Xfull)
+  fit.Theta <- lm(as.formula(paste(c(paste(outcomes, "~"), paste(names(Xfull)[2:length(names(Xfull))], 
+                                                                 collapse=" + ")), collapse=" ")), 
+                  data=data.theta)
   
   
   # initialize the first model iteration
@@ -882,7 +925,35 @@ informativeDropout <- function(data, id.var, outcomes.var, group.var, covariates
   
 }
 
+test.example <- function() {
+  data <- read.csv("test.csv")
+  data$day = data$years * 365
+  
+  informativeDropout(data, "WIHSID", "logcd4", "hard", c("AGEATBL", "minority"), 
+                     "drop", "day", "bayes.splines", "normal",
+                     knots.options=list(birthProbability=0.5, min=3, max=10, 
+                                        startPositions=c(330,550,1060), candidatePositions=seq(10,max(data$day),10)), 
+                     mcmc.options=list(iterations=20, burnIn=10),
+                     prior.options=list(shape.tau = 0.001, rate.tau = 0.001, 
+                                        sigmaError.df = 3, sigmaError.scaleMatrix = diag(2)))
+}
 
+
+# for debugging
+data = data
+data = data
+ids.var = "WIHSID"
+outcomes = "logcd4"
+groups = "hard"
+covariates = c("AGEATBL", "minority")
+times.dropout = "drop"
+times.observation = "day"
+dist = "normal"
+knots.options=list(birthProbability=0.5, min=3, max=10, 
+                   startPositions=c(330,550,1060), candidatePositions=seq(10,max(data$day),10)) 
+mcmc.options=list(iterations=20, burnIn=10)
+prior.options=list(shape.tau = 0.001, rate.tau = 0.001, 
+                   sigmaError.df = 3, sigmaError.scaleMatrix = diag(2))
 
 
 
