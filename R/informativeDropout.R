@@ -65,6 +65,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                                              times.dropout.var, times.observation.var, 
                                              dist, knots.options, mcmc.options, prior.options) {
   
+  dropoutEstimationTimes = c(300, 500, 1100)
   # validate the knot options.
   if (knots.options$birthProbability <= 0 || knots.options$birthProbability >= 1) {
     stop("Knot options error :: Invalid birth probability. Please specified a value between 0 and 1.")
@@ -127,6 +128,8 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   })
   # number of observations per subject
   numObservations = as.vector(table(data[,ids.var]))
+  # index of the first observation per subject
+  firstObsPerSubject = cumsum(numObservations)
   
   # initialize the random effects design matrix
   # note, this is not a true full 
@@ -135,7 +138,6 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   # initialize the random effects
   alpha = data.frame(groups=data[,groups.var], intercept=rep(0, nrow(data)), slope=rep(0, nrow(data)))
   names(alpha) = c(groups.var, "intercept", "slope")
-  #alpha.subject = 
     
   # initialize the X matrix - this is split by group since each group may
   X = lapply(groupList, function(group) { 
@@ -260,7 +262,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                         Z=group.Z, alpha=group.alpha, 
                         betaCovariates=model.current$betaCovariates,  
                         sigma.error=model.current$sigma.error)
-      cache$X[[group.index]] = result$X
+      X[[group.index]] = result$X
       model.current$knots[[group.index]] = result$knots
       model.current$proposed$knot.move = result$proposed
       model.current$accepted$knot.move = result$accepted
@@ -306,9 +308,10 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       updateRandomEffects(dist=dist, 
                           numSubjects=numSubjects, 
                           numObservations=numObservations, 
+                          firstObsPerSubject=firstObsPerSubject,
                           subjectsPerGroup=subjectsPerGroup,
                           ids=data[,ids.var], outcomes=outcomes, 
-                          times.observation=times.observation,
+                          times.observation=data[,times.observation.var],
                           covariates=covariates, 
                           X=X, Theta=model.current$Theta, 
                           Z=Z, alpha=alpha, 
@@ -319,16 +322,37 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                           sigma.error=model.current$sigma.error)
     
     # update variance components
-    result = updateVarianceComponents(modelIteration.current, modelIteration.previous, knots.options)
+    result = updateCovarianceParameters(dist=dist,
+                                        totalObservations=nrow(data), 
+                                        numSubjects=numSubjects,
+                                        outcomes=outcomes, 
+                                        covariates=covariates,
+                                        X=X, Theta=model.current$Theta,
+                                        Z=Z, alpha=alpha,
+                                        betaCovariates=model.current$betaCovariates,
+                                        sigma.error=sigma.error,
+                                        prior.options=prior.options)
     model.current$sigma.randomIntercept = result$sigma.randomIntercept
     model.current$sigma.randomSlope = result$sigma.randomSlope
     model.current$sigma.randomInterceptSlope = result$sigma.randomInterceptSlope
     
     # calculate marginal slope
-    result = calculateMarginalSlope(model.current, cache)
+    result = calculateMarginalSlope(knotsByGroup = model.current$knots, 
+                                    ThetaByGroup = model.current$Theta, 
+                                    subjectsPerGroup=subjectsPerGroup,
+                                    times.dropout=data[firstObsPerSubject,times.dropout.var])
+    model.current$slope.marginal = result
     
     # calculate dropout time specific slopes
-    result = calculateDropoutTimeSpecificSlope(model.current, cache)
+    result = calculateDropoutTimeSpecificSlope(
+      dropoutEstimationTimes=dropoutEstimationTimes, 
+      knotsByGroup = model.current$knots, 
+      ThetaByGroup = model.current$Theta, 
+      subjectsPerGroup=subjectsPerGroup,
+      times.observation=data[,times.observation.var],
+      times.dropout=data[firstObsPerSubject,times.dropout.var]
+    )
+    model.current$slope.dropoutSpecific = result
     
     # save the current iteration
     modelIterationList[[i]] = model.current
@@ -338,7 +362,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   
   
   # return the estimates, with distributions, and the model results from each iteration
-  return (model.fit)
+  return (modelIterationList)
   
 }
 
@@ -393,7 +417,7 @@ test.example <- function() {
   prior.options=list(shape.tau = 0.001, rate.tau = 0.001, lambda.numKnots = 1,
                      sigma.beta = 1, sigmaError.df = 3, sigmaError.scaleMatrix = diag(2))
   
-  informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
+  result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
                      times.dropout.var, times.observation.var, 
                      method, dist,
                      knots.options = knots.options, 

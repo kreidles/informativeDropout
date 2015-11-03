@@ -431,12 +431,17 @@ updateFixedEffectsCovariates <- function(dist, outcomes, covariates,
 #' @return 
 #' @examples
 #'
-updateRandomEffects <- function(dist, numSubjects, numObservations, subjectsPerGroup,
-                                ids, outcomes, times.observation, 
+updateRandomEffects <- function(dist, numSubjects, numObservations, firstObsPerSubject,
+                                subjectsPerGroup, ids, outcomes, times.observation, 
                                 covariates, X, Theta, 
                                 Z, alpha, betaCovariates,  
                                 sigma.randomIntercept, sigma.randomSlope,
                                 sigma.randomInterceptSlope, sigma.error) {
+  
+  # get the random intercepts, one per subject
+  alpha.slopeOnePerSubject = alpha$slope[firstObsPerSubject]
+  alpha.interceptOnePerSubject = alpha$intercept[firstObsPerSubject]
+  
   # calculate rho
   rho = (sigma.randomInterceptSlope / sqrt(sigma.randomIntercept * sigma.randomSlope))
   
@@ -464,44 +469,34 @@ updateRandomEffects <- function(dist, numSubjects, numObservations, subjectsPerG
                                      (1 - rho*rho))
   mean.randomIntercept <- (variance.randomIntercept * 
                              (tau.error * as.vector(tapply(residuals,ids,sum)) + 
-                                alpha$slope * (rho / (1 - rho*rho)) * 
+                                alpha.slopeOnePerSubject * (rho / (1 - rho*rho)) * 
                                 (1 / sqrt(sigma.randomIntercept * sigma.randomSlope))))
   # draw a new random effect sample
   randomIntercepts <-rnorm(numSubjects, mean.randomIntercept, sqrt(variance.randomIntercept))
   
   # get the conditional distribution of the random slope -- FIX RESIDUALS!
   # update the residuals
-  residuals = outcomes - Z$intercept %*%
-  for(i in 1:length(X)) {
-    residuals.group = (outcomes[[i]] - 
-                         Z[[i]][,1] %*% alpha[[i]][,1] - 
-                         X[[i]] %*% Theta[[i]])
-    if (!is.null(covariates)) {
-      residuals.group = residuals.group - covariates[[i]] %*% betaCovariates
-    }
-    residuals <- c(residuals, residuals.group) 
+  residuals = outcomes - cBeta - Z$intercept * alpha$intercept 
+  if (!is.null(covariates)) {
+    residuals <- residuals - as.matrix(covariates) %*% as.matrix(betaCovariates)
   }
+  residuals = residuals[,outcomes.var]
   
-  variance.randomSlope <- 1 / (tau.error * tapply(timesByGroup^2, idsByGroup, sum) + tau.randomSlope * (1 - rho*rho))
+  variance.randomSlope <- 1 / (tau.error * as.vector(tapply(times.observation^2, ids, sum)) + 
+                                 tau.randomSlope * (1 - rho*rho))
   mean.randomSlope <- (variance.randomSlope * 
-                         (tau.error * tapply(timesByGroup*residuals,patid,sum) + 
-                            modelIteration$alpha.intercept * (rho / (1 - rho*rho)) * 
+                         (tau.error * as.vector(tapply(times.observation*residuals,ids,sum)) + 
+                            alpha.interceptOnePerSubject * (rho / (1 - rho*rho)) * 
                             (1 / sqrt(sigma.randomIntercept * sigma.randomSlope))))
   
   
   randomSlopes <-rnorm(numSubjects, mean.randomSlope, sqrt(variance.randomSlope))
   
   # build the new random effects matrix
-  alpha.total = cbind(randomIntercepts, randomSlopes)
+  alpha.total = data.frame(intercept=randomIntercepts, slope=randomSlopes)
   
-  # split up the new random effects into groups again
-  start = 1
-  alpha = vector(mode = 'list', length(subjectsPerGroup))
-  for(i in 1:length(subjectsPerGroup)) {
-    alpha[[i]] = alpha.total[start:(start+subjectsPerGroup[[i]])]
-    start = start + groupRows[[i]] + 1
-  }
-  
+  alpha = alpha.total[rep(seq_len(nrow(alpha.total)), numObservations),]
+  # expand back out to complete alpha matrix
   return (alpha)
   
 }
@@ -516,38 +511,33 @@ updateRandomEffects <- function(dist, numSubjects, numObservations, subjectsPerG
 #' add(1, 1)
 #' add(10, 1)
 #' 
-updateCovarianceParameters <- function(totalObservations, numSubjects,
+updateCovarianceParameters <- function(dist, totalObservations, numSubjects,
                                        outcomes, covariates, X, Theta, 
                                        Z, alpha, betaCovariates,
                                        sigma.error,
                                        prior.options) {
-  # update the residuals
-  residuals = vector(0)
-  alphaByGroup = NULL
+  # build the residuals
+  cBeta = vector()
   for(i in 1:length(X)) {
-    residuals.group = (outcomes[[i]] - 
-                         Z[[i]] %*% alpha[[i]] - 
-                         X[[i]] %*% Theta[[i]])
-    if (!is.null(covariates)) {
-      residuals.group = residuals.group - covariates[[i]] %*% betaCovariates
-    }
-    residuals <- c(residuals, residuals.group) 
-    
-    if (is.null(alphaByGroup)) {
-      alphaByGroup = alpha[[i]]
-    } else {
-      alphaByGroup <- rbind(alphaByGroup, alpha[[i]])
-    }
+    cBeta.group = X[[i]] %*% Theta[[i]]
+    cBeta <- c(cBeta, cBeta.group) 
   }
+  # calculate the residuals
+  residuals <- outcomes - cBeta - Z$intercept * alpha$intercept - Z$slope * alpha$slope
+  if (!is.null(covariates)) {
+    residuals <- residuals - as.matrix(covariates) %*% as.matrix(betaCovariates)
+  }
+  residuals = residuals[,outcomes.var]
+  
   
   # sample from an inverse Gamma to update sigma.error
-  shape <- prior.options$shape.tau + (N / 2) 
+  shape <- prior.options$shape.tau + (totalObservations / 2) 
   rate <- prior.options$rate.tau + (crossprod(residuals) / 2)
   sigma.error <- 1 / rgamma(1, shape, rate)
   
   # sample from an inverse wishart to update the covariance of the random effects
   sigma.alpha <- riwish(prior.options$sigmaError.df + numSubjects, 
-                        prior.options$sigmaError.scaleMatrix + crossprod(as.matrix(alphaByGroup)))
+                        prior.options$sigmaError.scaleMatrix + crossprod(as.matrix(alpha)))
   
   
   sigma.randomIntercept = sigma.alpha[1,1]
@@ -564,24 +554,23 @@ updateCovarianceParameters <- function(totalObservations, numSubjects,
 #'
 #'
 calculateMarginalSlope <- function(knotsByGroup, ThetaByGroup, subjectsPerGroup,
-                                   times.observation, times.dropout) {
+                                   times.dropout) {
   
   marginal <- vector(0, mode="list")
-  for(i in length(knotsByGroup)) {
+  startRow <- 1
+  for(i in 1:length(knotsByGroup)) {
     knots <- knotsByGroup[[i]]
-    
+    times.dropout.group = times.dropout[startRow:(startRow + subjectsPerGroup[[i]] - 1)]
     # get the current spline coefficients minus the intercept
     Theta <- ThetaByGroup[[i]]
     ThetaNoInt <- Theta[2:length(Theta)] 
     
     if (length(knots) > 1) {
-      knots.boundary = range(knots.star)
-      knots.interior = knots.star[-c(1,length(knots.star))] 
+      knots.boundary = range(knots)
+      knots.interior = knots[-c(1,length(knots))] 
       # Calculate spline transformation of dropout time and create the proposed X matrix
-      spline <- cbind(
-        ns(times.dropout, knots=knots.interior, Boundary.knots=knots.boundary, 
-           intercept=T) 
-      )
+      spline <- ns(times.dropout.group, knots=knots.interior, Boundary.knots=knots.boundary,
+                   intercept=T) 
       
       # randomly select the proportion of subjects dropping out at each time
       propDroppedOut <- rdirichlet(1, rep(1,subjectsPerGroup[[i]]))
@@ -591,7 +580,11 @@ calculateMarginalSlope <- function(knotsByGroup, ThetaByGroup, subjectsPerGroup,
     } else {
       marginal[[i]] <- ThetaNoInt
     }
+    
+    startRow = startRow + subjectsPerGroup[[i]]
   }
+  
+  return(marginal)
 }
 
 
@@ -600,7 +593,7 @@ calculateDropoutTimeSpecificSlope <- function(dropoutEstimationTimes, knotsByGro
                                               times.observation, times.dropout) {
   
   dropoutSpecificSlopes <- vector(0, mode="list")
-  for(i in length(knotsByGroup)) {
+  for(i in 1:length(knotsByGroup)) {
     knots <- knotsByGroup[[i]]
     
     # get the current spline coefficients minus the intercept
@@ -608,10 +601,10 @@ calculateDropoutTimeSpecificSlope <- function(dropoutEstimationTimes, knotsByGro
     ThetaNoInt <- Theta[2:length(Theta)] 
     
     if (length(knots) > 1) {
-      knots.boundary = range(knots.star)
-      knots.interior = knots.star[-c(1,length(knots.star))] 
+      knots.boundary = range(knots)
+      knots.interior = knots[-c(1,length(knots))] 
       # Calculate spline transformation at specified dropout times
-      spline <- ns(dropoutEstimationTimes, knots=knotstar.i, Boundary.knots=knotstar.b, intercept=T)
+      spline <- ns(dropoutEstimationTimes, knots=knots.interior, Boundary.knots=knots.boundary, intercept=T)
       # calculate the marginal slope for the current group
       dropoutSpecificSlopes[[i]] <- t((spline) %*% ThetaNoInt)
       
@@ -619,6 +612,8 @@ calculateDropoutTimeSpecificSlope <- function(dropoutEstimationTimes, knotsByGro
       dropoutSpecificSlopes[[i]] <- rep(length(dropoutEstimationTimes), ThetaNoInt)
     } 
   }
+  
+  return(dropoutSpecificSlopes)
 }
 
 #'
