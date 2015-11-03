@@ -126,6 +126,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     # get the covariates
     return(length(unique(data[data[,groups.var] == group, ids.var])))
   })
+
   # number of observations per subject
   numObservations = as.vector(table(data[,ids.var]))
   # index of the first observation per subject
@@ -136,9 +137,10 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   Z = data.frame(groups=data[,groups.var], intercept=rep(1,nrow(data)), times=data[,times.observation.var])
   names(Z) = c(groups.var, "intercept", "slope")
   # initialize the random effects
-  alpha = data.frame(groups=data[,groups.var], intercept=rep(0, nrow(data)), slope=rep(0, nrow(data)))
-  names(alpha) = c(groups.var, "intercept", "slope")
+  alpha = data.frame(intercept=rep(0, nrow(data)), slope=rep(0, nrow(data)))
+  names(alpha) = c("intercept", "slope")
     
+  
   # initialize the X matrix - this is split by group since each group may
   X = lapply(groupList, function(group) { 
     groupTimes = data[data[,groups.var] == group,times.observation.var]
@@ -177,17 +179,17 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                      sigma.error = 1, sigma.spline = 1, sigma.randomIntercept = 1,
                      sigma.randomSlope = 1, sigma.randomInterceptSlope = 0,
                      shape.tau = 0.001, rate.tau = 0.001)
-  
   #
   # Run the reversible jump MCMC
   #
   for (i in 2:mcmc.options$iterations) {
-    
+
     model.previous = modelIterationList[[i-1]]
     # make a copy which will be modified as we move through the iteration
     model.current = model.previous
-    
+
     for (group.index in 1:length(groupList)) {
+      print(paste("ITER = ", i, " GROUP=", group.index, sep=""))
       group = groupList[group.index]
       # get the subset of data for this group
       groupData = data[data[,groups.var] == group,]
@@ -196,8 +198,10 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       group.times.dropout = groupData[,times.dropout.var]
       group.times.observation = groupData[,times.observation.var]
       group.covariates = groupData[, covariates.var]
+
       group.Z = Z[Z[,groups.var] == group,c("intercept", "slope")]
       group.alpha = alpha[alpha[,groups.var] == group,c("intercept", "slope")]
+      print(paste("GROUP SETUP DONE", sep=""))
       
       # randomly decide to add/remove a knot
       if ((runif(1) < knots.options$birthProbability & 
@@ -386,6 +390,7 @@ informativeDropout <- function(data, ids.var, outcomes.var, groups.var, covariat
     return (informativeDropout.bayes.splines(data, ids.var, outcomes.var, groups.var, covariates.var, 
                                              times.dropout.var, times.observation.var, dist, 
                                              knots.options, mcmc.options, prior.options))
+    
   } else if (method == 'bayes.dirichlet') {
     # account for informative dropout using a dirichlet process 
     return (informativeDropout.bayes.dirichlet(data, ids.var, outcomes.var, groups.var, covariates.var, 
