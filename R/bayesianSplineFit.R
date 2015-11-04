@@ -178,7 +178,7 @@ removeKnot <- function(dist, knots.previous, knots.options,
          intercept=T) * times.observation
     )
   } else {
-    X.star<-cbind(rep(1, nrow(data)), times.observation)
+    X.star<-cbind(rep(1, length(times.observation)), times.observation)
   }
   
   # Calculate residuals
@@ -416,7 +416,7 @@ updateFixedEffectsCovariates <- function(dist, outcomes, covariates,
     sum(log(dnorm(residuals, 0, sqrt(sigma.error)))) - 
     log(dmvnorm(betaCovariates.previous, rep(0, ncol(covariates)), covarIntThetaInverse)) - 
     log(dmvnorm(betaCovariates.star, proposedMean, proposedCovariance))
-  
+  print(paste("RHO: ", rho,sep=""))
   if (rho > log(runif(1))) {
     return (list(betaCovariates=betaCovariates.star, accepted=TRUE))
   } else {
@@ -437,7 +437,6 @@ updateRandomEffects <- function(dist, numSubjects, numObservations, firstObsPerS
                                 Z, alpha, betaCovariates,  
                                 sigma.randomIntercept, sigma.randomSlope,
                                 sigma.randomInterceptSlope, sigma.error) {
-  
   # get the random intercepts, one per subject
   alpha.slopeOnePerSubject = alpha$slope[firstObsPerSubject]
   alpha.interceptOnePerSubject = alpha$intercept[firstObsPerSubject]

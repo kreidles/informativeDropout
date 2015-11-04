@@ -117,6 +117,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   
   # sort the data by group, id, observation time
   data <- data[order(data[,groups.var], data[,ids.var], data[,times.observation.var]),]
+  rownames(data) <- NULL
   # get the list of treatment groups
   groupList <- unique(data[,groups.var])
   # number of subjects
@@ -126,12 +127,20 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     # get the covariates
     return(length(unique(data[data[,groups.var] == group, ids.var])))
   })
-
-  # number of observations per subject
-  numObservations = as.vector(table(data[,ids.var]))
-  # index of the first observation per subject
-  firstObsPerSubject = cumsum(numObservations)
+  # start/end rows for groups
+  numObsPerGroup = sapply(groupList, function(group) {
+    return(nrow(data[data[,groups.var] == group,]))
+  })
+  startRowByGroup = c(1, 1 + cumsum(numObsPerGroup)[-length(numObsPerGroup)])
+  endRowByGroup = cumsum(numObsPerGroup)
   
+  # number of observations per subject
+  numObservations = sapply(unique(data[,ids.var]), function(id) {
+    return(nrow(data[data[,ids.var] == id,]))
+  })
+  # index of the first observation per subject
+  firstObsPerSubject = c(1,1+cumsum(numObservations)[-length(numObservations)])
+
   # initialize the random effects design matrix
   # note, this is not a true full 
   Z = data.frame(groups=data[,groups.var], intercept=rep(1,nrow(data)), times=data[,times.observation.var])
@@ -139,7 +148,6 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   # initialize the random effects
   alpha = data.frame(intercept=rep(0, nrow(data)), slope=rep(0, nrow(data)))
   names(alpha) = c("intercept", "slope")
-    
   
   # initialize the X matrix - this is split by group since each group may
   X = lapply(groupList, function(group) { 
@@ -193,6 +201,8 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       group = groupList[group.index]
       # get the subset of data for this group
       groupData = data[data[,groups.var] == group,]
+      group.startRow = startRowByGroup[group.index]
+      group.endRow = endRowByGroup[group.index]
       # group specific variables (these are unchanged throughout the iteration)
       group.outcomes = groupData[,outcomes.var]
       group.times.dropout = groupData[,times.dropout.var]
@@ -200,14 +210,14 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       group.covariates = groupData[, covariates.var]
 
       group.Z = Z[Z[,groups.var] == group,c("intercept", "slope")]
-      group.alpha = alpha[alpha[,groups.var] == group,c("intercept", "slope")]
-      print(paste("GROUP SETUP DONE", sep=""))
-      
+      group.alpha = alpha[(group.startRow:group.endRow),]
+
       # randomly decide to add/remove a knot
       if ((runif(1) < knots.options$birthProbability & 
            length(model.current$knots) != knots.options$max) | 
           (length(model.current$knots) == knots.options$min)) {
         # add a knot
+        print("ADD")
         result = addKnot(dist=dist,
                          knots.previous=model.current$knots[[group.index]], 
                          knots.options=knots.options, 
@@ -231,6 +241,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
         
       } else {
         # remove a knot
+        print("REMOVE")
         result = removeKnot(dist=dist, knots.previous=model.current$knots[[group.index]], 
                             knots.options=knots.options, 
                             outcomes=group.outcomes, 
@@ -254,6 +265,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       }
       
       # Move knots
+      print("MOVE")
       result = moveKnot(dist=dist, knots.previous=model.current$knots[[group.index]], 
                         knots.stepSize=knots.options$stepSize, 
                         knots.candidatePositions=knots.options$candidatePositions,
@@ -272,6 +284,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       model.current$accepted$knot.move = result$accepted
       
       # update fixed effects (includes coefficients for covariates and time varying slopes)
+      print("FIXED")
       result = updateFixedEffects(dist=dist,
                                   knots.previous=model.current$knots[[group.index]], 
                                   knots.options=knots.options, 
@@ -294,6 +307,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     }  
     
     # update fixed effects associated with covariates
+    print("FIXED COVAR")
     result = updateFixedEffectsCovariates(dist=dist, 
                                           outcomes=outcomes, 
                                           covariates=covariates, 
@@ -308,6 +322,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     model.current$accepted$fixedEffectsCovariates = result$accepted
     
     # update random effects
+    print("RANDOM")
     alpha = 
       updateRandomEffects(dist=dist, 
                           numSubjects=numSubjects, 
@@ -326,6 +341,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                           sigma.error=model.current$sigma.error)
     
     # update variance components
+    print("COVAR")
     result = updateCovarianceParameters(dist=dist,
                                         totalObservations=nrow(data), 
                                         numSubjects=numSubjects,
