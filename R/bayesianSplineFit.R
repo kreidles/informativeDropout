@@ -416,9 +416,8 @@ updateFixedEffectsCovariates <- function(dist, outcomes, covariates,
     sum(log(dnorm(residuals, 0, sqrt(sigma.error)))) - 
     log(dmvnorm(betaCovariates.previous, rep(0, ncol(covariates)), covarIntThetaInverse)) - 
     log(dmvnorm(betaCovariates.star, proposedMean, proposedCovariance))
-  print(paste("RHO: ", rho,sep=""))
   if (rho > log(runif(1))) {
-    return (list(betaCovariates=betaCovariates.star, accepted=TRUE))
+    return (list(betaCovariates=as.vector(betaCovariates.star), accepted=TRUE))
   } else {
     return (list(betaCovariates=betaCovariates.previous, accepted=FALSE))
   }
@@ -457,6 +456,10 @@ updateRandomEffects <- function(dist, numSubjects, numObservations, firstObsPerS
     cBeta <- c(cBeta, cBeta.group) 
   }
   # calculate the residuals
+  print("BETAC")
+  print(as.matrix(betaCovariates))
+  print(dim(covariates))
+  
   residuals <- outcomes - cBeta - Z$slope * alpha$slope
   if (!is.null(covariates)) {
     residuals <- residuals - as.matrix(covariates) %*% as.matrix(betaCovariates)

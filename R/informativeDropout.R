@@ -438,6 +438,7 @@ test.example <- function() {
   prior.options=list(shape.tau = 0.001, rate.tau = 0.001, lambda.numKnots = 1,
                      sigma.beta = 1, sigmaError.df = 3, sigmaError.scaleMatrix = diag(2))
   
+  set.seed(1066)
   result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
                      times.dropout.var, times.observation.var, 
                      method, dist,
