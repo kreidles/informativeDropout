@@ -74,8 +74,8 @@ addKnot <- function(dist, knots.previous, knots.options,
                     sigma.error, sigma.beta, lambda.numKnots) {
   
   # add a knot by randomly selecting a candidate knot
-  index = sample(1:length(knots.options$candidatePositions), 1)
-  newKnot.value = knots.options$candidatePositions[index]
+  candidatesPositions = knots.options$candidatePositions[! knots.options$candidatePositions %in% knots.previous]
+  newKnot.value = sample(candidatesPositions, 1)
   knots.star <- sort(c(knots.previous, newKnot.value))
   # get the interior and boundary knots, and grab the position of the knot that
   # was just added
@@ -104,18 +104,20 @@ addKnot <- function(dist, knots.previous, knots.options,
   Theta.LSXprev <- ginv(crossprod(X.previous))%*%(crossprod(X.previous,yls))
   Theta.LSXstar <- ginv(crossprod(X.star))%*%(crossprod(X.star,yls))
   Theta.LSresid <- Theta.previous - Theta.LSXprev
+  
   #Draw a residual for the added coefficient and calculate coefficient transformation
   residual <- rnorm(1, 0, sigma.error)
-  beta.newKnot <- Theta.LSXstar[newKnot.position+1] + residual
+  # adjust position by 1 since first coefficient is the group intercept
+  beta.newKnot <- Theta.LSXstar[(newKnot.position+1)] + residual
   beta.other <- Theta.LSXstar[-(newKnot.position+1)] + Theta.LSresid
   # insert the new beta value in the correct position
   if (newKnot.position == 1) {
     Theta.star = c(beta.other[1], beta.newKnot, beta.other[2:length(beta.other)])
-  } else if (newKnot.position == length(knots)) {
+  } else if (newKnot.position == length(knots.star)) {
     Theta.star = c(beta.other, beta.newKnot)
   } else {
-    Theta.star = c(beta.other[1:(newKnot.position-1)], beta.newKnot, 
-                   beta.other[(newKnot.position):length(beta.other)])
+    Theta.star = c(beta.other[1:(newKnot.position)], beta.newKnot, 
+                   beta.other[(newKnot.position+1):length(beta.other)])
   }
   
   # Calculate residuals for likelihood ratio
@@ -408,14 +410,15 @@ updateFixedEffectsCovariates <- function(dist, outcomes, covariates,
   # calculate the residuals
   resid.star <- residuals - covariates.matrix %*% t(betaCovariates.star)
   resid.previous <- residuals - covariates.matrix %*% (as.matrix(betaCovariates.previous))
-  
+
   # calculate the acceptance probability
   rho<-sum(log(dnorm(as.vector(resid.star), 0, sqrt(sigma.beta)))) + 
     log(dmvnorm(betaCovariates.star, rep(0, ncol(covariates)), covarIntThetaInverse)) + 
     log(dmvnorm(betaCovariates.previous, proposedMean, proposedCovariance)) - 
-    sum(log(dnorm(residuals, 0, sqrt(sigma.error)))) - 
+    sum(log(dnorm(residuals, 0, sqrt(sigma.beta)))) - 
     log(dmvnorm(betaCovariates.previous, rep(0, ncol(covariates)), covarIntThetaInverse)) - 
     log(dmvnorm(betaCovariates.star, proposedMean, proposedCovariance))
+  
   if (rho > log(runif(1))) {
     return (list(betaCovariates=as.vector(betaCovariates.star), accepted=TRUE))
   } else {
@@ -456,10 +459,6 @@ updateRandomEffects <- function(dist, numSubjects, numObservations, firstObsPerS
     cBeta <- c(cBeta, cBeta.group) 
   }
   # calculate the residuals
-  print("BETAC")
-  print(as.matrix(betaCovariates))
-  print(dim(covariates))
-  
   residuals <- outcomes - cBeta - Z$slope * alpha$slope
   if (!is.null(covariates)) {
     residuals <- residuals - as.matrix(covariates) %*% as.matrix(betaCovariates)
@@ -623,7 +622,7 @@ calculateDropoutTimeSpecificSlope <- function(dropoutEstimationTimes, knotsByGro
 #'
 #'
 #'
-getInitialEstimatesTheta <- function(dist, X, outcomes) {
+getInitialEstimatesTheta <- function(dist, groupList, X, outcomes) {
   data.theta = cbind(outcomes, X)
   formula = as.formula(paste(c(paste(names(outcomes), "~"), 
                                paste(names(X)[2:length(names(X))], 

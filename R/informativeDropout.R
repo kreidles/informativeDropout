@@ -172,7 +172,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   names(covariates) = c(covariates.var)
   # use a simple linear model fit to obtain initial estimates for 
   # the spline coefficients
-  Theta.init = getInitialEstimatesTheta(dist, X.full, outcomes)
+  Theta.init = getInitialEstimatesTheta(dist, groupList, X.full, outcomes)
   # use a simple linear model fit to obtain initial estimates for the
   # covariate coefficients
   betaCovariate.init = getInitialEstimatesCovariates(dist, covariates, outcomes)
