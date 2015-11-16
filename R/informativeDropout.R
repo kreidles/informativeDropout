@@ -51,6 +51,15 @@ library(abind)
 
 
 
+
+informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, groups.var, 
+                                               covariates.var, 
+                                               times.dropout.var, times.observation.var, 
+                                               dist, knots.options, prior.options) {
+  
+}
+
+
 #'
 #' Fit a varying coefficient model for longitudinal studies with
 #' informative dropout.  Uses a Bayesian approach with a spline fit
@@ -168,8 +177,12 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   outcomes = as.data.frame(data[,outcomes.var])
   names(outcomes) = c(outcomes.var)
   # extract the covariates
-  covariates = as.data.frame(data[,covariates.var])
-  names(covariates) = c(covariates.var)
+  covariates = NULL
+  if (!is.null(covariates.var)) {
+    covariates = as.data.frame(data[,covariates.var])
+    names(covariates) = c(covariates.var)
+  }
+
   # use a simple linear model fit to obtain initial estimates for 
   # the spline coefficients
   Theta.init = getInitialEstimatesTheta(dist, groupList, X.full, outcomes)
@@ -184,7 +197,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     rjmcmc.iteration(knots=lapply(1:length(groupList), function(i) { 
                         return (knots.options$startPositions); }), 
                      Theta=Theta.init, betaCovariate=betaCovariate.init,
-                     sigma.error = 1, sigma.spline = 1, sigma.randomIntercept = 1,
+                     sigma.error = 1, sigma.spline = 1.25^2, sigma.randomIntercept = 1,
                      sigma.randomSlope = 1, sigma.randomInterceptSlope = 0,
                      shape.tau = 0.001, rate.tau = 0.001)
   #
@@ -207,7 +220,11 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       group.outcomes = groupData[,outcomes.var]
       group.times.dropout = groupData[,times.dropout.var]
       group.times.observation = groupData[,times.observation.var]
-      group.covariates = groupData[, covariates.var]
+      
+      group.covariates = NULL
+      if (!is.null(covariates)) {
+        group.covariates = groupData[, covariates.var]
+      }
 
       group.Z = Z[Z[,groups.var] == group,c("intercept", "slope")]
       group.alpha = alpha[(group.startRow:group.endRow),]
@@ -445,6 +462,40 @@ test.example <- function() {
                      knots.options = knots.options, 
                      mcmc.options = mcmc.options,
                      prior.options = prior.options)
+}
+
+test.sim <- function() {
+  data <- read.table("../../Rnsv/code/sim_sml_1.dat")
+  #data$day = data$years * 365
+  
+  names(data) <- c("patid", "alpha", "drptm", "b1", "b2",
+                  "b2ui", "b2uii", "b2uiii", "t", "e", "yi", "yii", "yiii")
+  data$group <- rep(1,nrow(data))
+  # for debugging
+  ids.var = "patid"
+  outcomes.var = "yiii"
+  groups.var = "group"
+  covariates.var = NULL
+  times.dropout.var = "drptm"
+  times.observation.var = "t"
+  method="bayes.splines"
+  dist = "gaussian"
+  knots.options=list(birthProbability=0.2, min=1, max=10, stepSize=0.1,
+                     startPositions=c(0,0.23333333,0.5, 0.76666667,1), candidatePositions=seq(0,1,0.1/3)) 
+  mcmc.options=list(iterations=20, burnIn=10, sigma.residual=1.25^2)
+  prior.options=list(shape.tau = 0.001, rate.tau = 0.001, lambda.numKnots = 5,
+                     sigma.beta = 25, sigmaError.df = 3, 
+                     sigmaError.scaleMatrix = diag(2))
+  start.options=list()
+  
+  
+  set.seed(1066)
+  result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
+                              times.dropout.var, times.observation.var, 
+                              method, dist,
+                              knots.options = knots.options, 
+                              mcmc.options = mcmc.options,
+                              prior.options = prior.options)
 }
 
 
