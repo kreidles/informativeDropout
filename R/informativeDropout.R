@@ -72,9 +72,9 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
 informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups.var, 
                                              covariates.var, 
                                              times.dropout.var, times.observation.var, 
-                                             dist, knots.options, mcmc.options, prior.options) {
+                                             dist, knots.options, mcmc.options, prior.options,
+                                             dropoutEstimationTimes) {
   
-  dropoutEstimationTimes = c(300, 500, 1100)
   # validate the knot options.
   if (knots.options$birthProbability <= 0 || knots.options$birthProbability >= 1) {
     stop("Knot options error :: Invalid birth probability. Please specified a value between 0 and 1.")
@@ -149,7 +149,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   })
   # index of the first observation per subject
   firstObsPerSubject = c(1,1+cumsum(numObservations)[-length(numObservations)])
-
+  
   # initialize the random effects design matrix
   # note, this is not a true full 
   Z = data.frame(groups=data[,groups.var], intercept=rep(1,nrow(data)), times=data[,times.observation.var])
@@ -182,7 +182,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     covariates = as.data.frame(data[,covariates.var])
     names(covariates) = c(covariates.var)
   }
-
+  
   # use a simple linear model fit to obtain initial estimates for 
   # the spline coefficients
   Theta.init = getInitialEstimatesTheta(dist, groupList, X.full, outcomes)
@@ -195,22 +195,22 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   modelIterationList <- vector(mode = "list", length = mcmc.options$iterations)
   modelIterationList[[1]] = 
     rjmcmc.iteration(knots=lapply(1:length(groupList), function(i) { 
-                        return (knots.options$startPositions); }), 
-                     Theta=Theta.init, betaCovariate=betaCovariate.init,
-                     sigma.error = 1, sigma.spline = 1.25^2, sigma.randomIntercept = 1,
-                     sigma.randomSlope = 1, sigma.randomInterceptSlope = 0,
-                     shape.tau = 0.001, rate.tau = 0.001)
+      return (knots.options$startPositions); }), 
+      Theta=Theta.init, betaCovariate=betaCovariate.init,
+      sigma.error = 1, sigma.spline = 1.25^2, sigma.randomIntercept = 1,
+      sigma.randomSlope = 1, sigma.randomInterceptSlope = 0,
+      shape.tau = 0.001, rate.tau = 0.001)
   #
   # Run the reversible jump MCMC
   #
   for (i in 2:mcmc.options$iterations) {
-
+    print(paste("ITER = ", i, sep=""))
+    
     model.previous = modelIterationList[[i-1]]
     # make a copy which will be modified as we move through the iteration
     model.current = model.previous
-
+    
     for (group.index in 1:length(groupList)) {
-      print(paste("ITER = ", i, " GROUP=", group.index, sep=""))
       group = groupList[group.index]
       # get the subset of data for this group
       groupData = data[data[,groups.var] == group,]
@@ -225,16 +225,16 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       if (!is.null(covariates)) {
         group.covariates = groupData[, covariates.var]
       }
-
+      
       group.Z = Z[Z[,groups.var] == group,c("intercept", "slope")]
       group.alpha = alpha[(group.startRow:group.endRow),]
-
+      
       # randomly decide to add/remove a knot
-      if ((runif(1) < knots.options$birthProbability & 
-           length(model.current$knots) != knots.options$max) | 
-          (length(model.current$knots) == knots.options$min)) {
+      u = runif(1)
+      if ((u < knots.options$birthProbability && 
+           length(model.current$knots[[group.index]]) < knots.options$max) || 
+          (length(model.current$knots[[group.index]]) <= knots.options$min)) {
         # add a knot
-        print("ADD")
         result = addKnot(dist=dist,
                          knots.previous=model.current$knots[[group.index]], 
                          knots.options=knots.options, 
@@ -246,6 +246,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                          Theta.previous=model.current$Theta[[group.index]],
                          Z=group.Z, alpha=group.alpha, 
                          betaCovariates=model.current$betaCovariates,  
+                         sigma.residual=mcmc.options$sigma.residual,
                          sigma.error=model.current$sigma.error, 
                          sigma.beta=prior.options$sigma.beta, 
                          lambda.numKnots=prior.options$lambda.numKnots)
@@ -258,7 +259,6 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
         
       } else {
         # remove a knot
-        print("REMOVE")
         result = removeKnot(dist=dist, knots.previous=model.current$knots[[group.index]], 
                             knots.options=knots.options, 
                             outcomes=group.outcomes, 
@@ -269,6 +269,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                             Theta.previous=model.current$Theta[[group.index]],
                             Z=group.Z, alpha=group.alpha, 
                             betaCovariates=model.current$betaCovariates,  
+                            sigma.residual=mcmc.options$sigma.residual,
                             sigma.error=model.current$sigma.error, 
                             sigma.beta=prior.options$sigma.beta, 
                             lambda.numKnots=prior.options$lambda.numKnots)  
@@ -280,9 +281,9 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
         model.current$proposed$knot.remove = TRUE
         model.current$accepted$knot.remove = result$accepted
       }
-      
+      print ("TOTAL KNOTS")
+      print (length(model.current$knots[[group.index]]))
       # Move knots
-      print("MOVE")
       result = moveKnot(dist=dist, knots.previous=model.current$knots[[group.index]], 
                         knots.stepSize=knots.options$stepSize, 
                         knots.candidatePositions=knots.options$candidatePositions,
@@ -324,22 +325,22 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     }  
     
     # update fixed effects associated with covariates
-    print("FIXED COVAR")
-    result = updateFixedEffectsCovariates(dist=dist, 
-                                          outcomes=outcomes, 
-                                          covariates=covariates, 
-                                          X=X, 
-                                          Theta=model.current$Theta, 
-                                          Z=Z, alpha=alpha, 
-                                          betaCovariates.previous=model.current$betaCovariates,  
-                                          sigma.error=model.current$sigma.error, 
-                                          sigma.beta=prior.options$sigma.beta)
-    model.current$betaCovariates = result$betaCovariates
-    model.current$proposed$fixedEffectsCovariates = TRUE
-    model.current$accepted$fixedEffectsCovariates = result$accepted
+    if (!is.null(covariates)) {
+      result = updateFixedEffectsCovariates(dist=dist, 
+                                            outcomes=outcomes, 
+                                            covariates=covariates, 
+                                            X=X, 
+                                            Theta=model.current$Theta, 
+                                            Z=Z, alpha=alpha, 
+                                            betaCovariates.previous=model.current$betaCovariates,  
+                                            sigma.error=model.current$sigma.error, 
+                                            sigma.beta=prior.options$sigma.beta)
+      model.current$betaCovariates = result$betaCovariates
+      model.current$proposed$fixedEffectsCovariates = TRUE
+      model.current$accepted$fixedEffectsCovariates = result$accepted
+    }
     
     # update random effects
-    print("RANDOM")
     alpha = 
       updateRandomEffects(dist=dist, 
                           numSubjects=numSubjects, 
@@ -358,7 +359,6 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                           sigma.error=model.current$sigma.error)
     
     # update variance components
-    print("COVAR")
     result = updateCovarianceParameters(dist=dist,
                                         totalObservations=nrow(data), 
                                         numSubjects=numSubjects,
@@ -416,13 +416,14 @@ informativeDropout <- function(data, ids.var, outcomes.var, groups.var, covariat
                                method="bayes.splines", dist="normal",
                                knots.options, 
                                mcmc.options=list(iterations=100000, burnIn=50000),
-                               prior.options) {
+                               prior.options, dropoutEstimationTimes) {
   
   if (method == 'bayes.splines') {
     # model the relationship between dropout time and slope using natural splines
     return (informativeDropout.bayes.splines(data, ids.var, outcomes.var, groups.var, covariates.var, 
                                              times.dropout.var, times.observation.var, dist, 
-                                             knots.options, mcmc.options, prior.options))
+                                             knots.options, mcmc.options, prior.options,
+                                             dropoutEstimationTimes = c(0,1,1/15)))
     
   } else if (method == 'bayes.dirichlet') {
     # account for informative dropout using a dirichlet process 
@@ -434,6 +435,24 @@ informativeDropout <- function(data, ids.var, outcomes.var, groups.var, covariat
                                      times.dropout.var, times.observation.var, dist, dist))
   }
   
+}
+
+acceptanceProbability <- function(fit, action) {
+  if (action == "knot.add") {
+    total_accepts = sum(sapply(fit, function(x) { return(as.numeric(x$accepted$knot.add)) }))
+  } else if (action == "knot.remove") {
+    total_accepts = sum(sapply(fit, function(x) { return(as.numeric(x$accepted$knot.remove)) }))
+  } else if (action == "knot.move") {
+    total_accepts = sum(sapply(fit, function(x) { return(as.numeric(x$accepted$knot.move)) }))
+    
+  } else if (action == "fixedEffects") {
+    total_accepts = sum(sapply(fit, function(x) { return(as.numeric(x$accepted$fixedEffects)) }))
+  } else if (action == "fixedEffectsCovariates") {
+    total_accepts = sum(sapply(fit, function(x) { return(as.numeric(x$accepted$fixedEffectsCovariates)) }))
+  }
+  
+  
+  return(total_accepts/length(fit))
 }
 
 test.example <- function() {
@@ -451,17 +470,17 @@ test.example <- function() {
   dist = "gaussian"
   knots.options=list(birthProbability=0.5, min=3, max=10, stepSize=3,
                      startPositions=c(330,550,1060), candidatePositions=seq(10,max(data$day),10)) 
-  mcmc.options=list(iterations=20, burnIn=10)
+  mcmc.options=list(iterations=20, burnIn=10, sigma.residual=1)
   prior.options=list(shape.tau = 0.001, rate.tau = 0.001, lambda.numKnots = 1,
                      sigma.beta = 1, sigmaError.df = 3, sigmaError.scaleMatrix = diag(2))
   
   set.seed(1066)
   result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
-                     times.dropout.var, times.observation.var, 
-                     method, dist,
-                     knots.options = knots.options, 
-                     mcmc.options = mcmc.options,
-                     prior.options = prior.options)
+                              times.dropout.var, times.observation.var, 
+                              method, dist,
+                              knots.options = knots.options, 
+                              mcmc.options = mcmc.options,
+                              prior.options = prior.options)
 }
 
 test.sim <- function() {
@@ -469,7 +488,7 @@ test.sim <- function() {
   #data$day = data$years * 365
   
   names(data) <- c("patid", "alpha", "drptm", "b1", "b2",
-                  "b2ui", "b2uii", "b2uiii", "t", "e", "yi", "yii", "yiii")
+                   "b2ui", "b2uii", "b2uiii", "t", "e", "yi", "yii", "yiii")
   data$group <- rep(1,nrow(data))
   # for debugging
   ids.var = "patid"
@@ -482,7 +501,7 @@ test.sim <- function() {
   dist = "gaussian"
   knots.options=list(birthProbability=0.2, min=1, max=10, stepSize=0.1,
                      startPositions=c(0,0.23333333,0.5, 0.76666667,1), candidatePositions=seq(0,1,0.1/3)) 
-  mcmc.options=list(iterations=20, burnIn=10, sigma.residual=1.25^2)
+  mcmc.options=list(iterations=10000, burnIn=10, sigma.residual=1.25^2)
   prior.options=list(shape.tau = 0.001, rate.tau = 0.001, lambda.numKnots = 5,
                      sigma.beta = 25, sigmaError.df = 3, 
                      sigmaError.scaleMatrix = diag(2))
@@ -495,7 +514,21 @@ test.sim <- function() {
                               method, dist,
                               knots.options = knots.options, 
                               mcmc.options = mcmc.options,
-                              prior.options = prior.options)
+                              prior.options = prior.options,
+                              dropoutEstimationTimes = seq(0,1,1/15))
+  
+  
+  acceptanceProbability(result, "knot.add")
+  acceptanceProbability(result, "knot.remove")
+  acceptanceProbability(result, "knot.move")
+  acceptanceProbability(result, "fixedEffects")
+  #acceptanceProbability(result, "fixedEffectsCovariates")
+  
+  
+  nknots = unlist(lapply(result, function(x) { return(length(x$knots[[1]])) } ))
+  ts.plot(nknots)
+  mean(unlist(lapply(result, function(x) { return(x$slope.marginal[[1]]) })))
+  
 }
 
 

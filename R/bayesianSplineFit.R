@@ -70,7 +70,7 @@ groupIndicatorColumn <- function(group) {
 addKnot <- function(dist, knots.previous, knots.options, 
                     outcomes, times.dropout, times.observation, covariates,
                     X.previous, Theta.previous, 
-                    Z, alpha, betaCovariates,  
+                    Z, alpha, betaCovariates, sigma.residual, 
                     sigma.error, sigma.beta, lambda.numKnots) {
   
   # add a knot by randomly selecting a candidate knot
@@ -165,7 +165,7 @@ addKnot <- function(dist, knots.previous, knots.options,
 removeKnot <- function(dist, knots.previous, knots.options, 
                        outcomes, times.dropout, times.observation, covariates,
                        X.previous, Theta.previous, 
-                       Z, alpha, betaCovariates,  
+                       Z, alpha, betaCovariates, sigma.residual,  
                        sigma.error, sigma.beta, lambda.numKnots) {
   
   # randomly remove an existing knot
@@ -394,21 +394,17 @@ updateFixedEffectsCovariates <- function(dist, outcomes, covariates,
     cBeta <- c(cBeta, cBeta.group) 
   }
   
-  print ("RANGES")
-  print (range(outcomes - cBeta))
-  print (range(Z$intercept * alpha$intercept))
-  print (range(Z$slope * alpha$slope))
-  
   # calculate the residuals
   residuals <- outcomes - cBeta - Z$intercept * alpha$intercept - Z$slope * alpha$slope
   residuals = residuals[,outcomes.var]
   # get the proposed mean/variance of the fixed effects associated with covariates
   covariates.matrix = as.matrix(covariates)
+  covarIntTheta <- diag(rep(sigma.beta, ncol(covariates))) 
   covarIntThetaInverse <- diag(rep(1/sigma.beta, ncol(covariates))) 
   proposedCovariance <- ginv(covarIntThetaInverse + 
-                               (1/sigma.beta) * t(covariates.matrix) %*% covariates.matrix)
+                               (1/sigma.error) * t(covariates.matrix) %*% covariates.matrix)
   proposedMean <- proposedCovariance %*% 
-    ((1/sigma.beta) * t(covariates.matrix) %*% as.matrix(residuals))
+    ((1/sigma.error) * t(covariates.matrix) %*% as.matrix(residuals))
   
   # Scale Cov to adjust acceptance rate
   proposedCovariance <- proposedCovariance * 
@@ -426,11 +422,11 @@ updateFixedEffectsCovariates <- function(dist, outcomes, covariates,
   resid.previous <- residuals - covariates.matrix %*% (as.matrix(betaCovariates.previous))
 
   # calculate the acceptance probability
-  rho<-sum(log(dnorm(as.vector(resid.star), 0, sqrt(sigma.beta)))) + 
-    log(dmvnorm(betaCovariates.star, rep(0, ncol(covariates)), covarIntThetaInverse)) + 
+  rho<-sum(log(dnorm(as.vector(resid.star), 0, sqrt(sigma.error)))) + 
+    log(dmvnorm(betaCovariates.star, rep(0, ncol(covariates)), covarIntTheta)) + 
     log(dmvnorm(betaCovariates.previous, proposedMean, proposedCovariance)) - 
-    sum(log(dnorm(residuals, 0, sqrt(sigma.beta)))) - 
-    log(dmvnorm(betaCovariates.previous, rep(0, ncol(covariates)), covarIntThetaInverse)) - 
+    sum(log(dnorm(residuals, 0, sqrt(sigma.error)))) - 
+    log(dmvnorm(betaCovariates.previous, rep(0, ncol(covariates)), covarIntTheta)) - 
     log(dmvnorm(betaCovariates.star, proposedMean, proposedCovariance))
   
   if (rho > log(runif(1))) {
@@ -481,7 +477,7 @@ updateRandomEffects <- function(dist, numSubjects, numObservations, firstObsPerS
   
   # get the conditional distribution of the random intercept, given the random slope
   variance.randomIntercept <- 1 / (tau.error * numObservations + tau.randomIntercept * 
-                                     (1 - rho*rho))
+                                     1/(1 - rho*rho))
   mean.randomIntercept <- (variance.randomIntercept * 
                              (tau.error * as.vector(tapply(residuals,ids,sum)) + 
                                 alpha.slopeOnePerSubject * (rho / (1 - rho*rho)) * 
@@ -498,7 +494,7 @@ updateRandomEffects <- function(dist, numSubjects, numObservations, firstObsPerS
   residuals = residuals[,outcomes.var]
   
   variance.randomSlope <- 1 / (tau.error * as.vector(tapply(times.observation^2, ids, sum)) + 
-                                 tau.randomSlope * (1 - rho*rho))
+                                 tau.randomSlope * 1/(1 - rho*rho))
   mean.randomSlope <- (variance.randomSlope * 
                          (tau.error * as.vector(tapply(times.observation*residuals,ids,sum)) + 
                             alpha.interceptOnePerSubject * (rho / (1 - rho*rho)) * 
