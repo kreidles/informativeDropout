@@ -362,6 +362,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     result = updateCovarianceParameters(dist=dist,
                                         totalObservations=nrow(data), 
                                         numSubjects=numSubjects,
+                                        firstObsPerSubject=firstObsPerSubject,
                                         outcomes=outcomes, 
                                         covariates=covariates,
                                         X=X, Theta=model.current$Theta,
@@ -369,6 +370,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                                         betaCovariates=model.current$betaCovariates,
                                         sigma.error=sigma.error,
                                         prior.options=prior.options)
+    model.current$sigma.error = result$sigma.error
     model.current$sigma.randomIntercept = result$sigma.randomIntercept
     model.current$sigma.randomSlope = result$sigma.randomSlope
     model.current$sigma.randomInterceptSlope = result$sigma.randomInterceptSlope
@@ -423,7 +425,7 @@ informativeDropout <- function(data, ids.var, outcomes.var, groups.var, covariat
     return (informativeDropout.bayes.splines(data, ids.var, outcomes.var, groups.var, covariates.var, 
                                              times.dropout.var, times.observation.var, dist, 
                                              knots.options, mcmc.options, prior.options,
-                                             dropoutEstimationTimes = c(0,1,1/15)))
+                                             dropoutEstimationTimes))
     
   } else if (method == 'bayes.dirichlet') {
     # account for informative dropout using a dirichlet process 
@@ -500,13 +502,13 @@ test.sim <- function() {
   method="bayes.splines"
   dist = "gaussian"
   knots.options=list(birthProbability=0.2, min=1, max=10, stepSize=0.1,
-                     startPositions=c(0,0.23333333,0.5, 0.76666667,1), candidatePositions=seq(0,1,0.1/3)) 
-  mcmc.options=list(iterations=10000, burnIn=10, sigma.residual=1.25^2)
+                     startPositions=c(0,7/30,0.5, 23/30,1), candidatePositions=seq(0,1,0.1/3)) 
+  mcmc.options=list(iterations=1000, burnIn=10, sigma.residual=1.25^2)
   prior.options=list(shape.tau = 0.001, rate.tau = 0.001, lambda.numKnots = 5,
                      sigma.beta = 25, sigmaError.df = 3, 
                      sigmaError.scaleMatrix = diag(2))
   start.options=list()
-  
+  dropoutEstimationTimes = seq(0,1,1/15)
   
   set.seed(1066)
   result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
@@ -515,7 +517,7 @@ test.sim <- function() {
                               knots.options = knots.options, 
                               mcmc.options = mcmc.options,
                               prior.options = prior.options,
-                              dropoutEstimationTimes = seq(0,1,1/15))
+                              dropoutEstimationTimes = dropoutEstimationTimes)
   
   
   acceptanceProbability(result, "knot.add")
@@ -527,8 +529,31 @@ test.sim <- function() {
   
   nknots = unlist(lapply(result, function(x) { return(length(x$knots[[1]])) } ))
   ts.plot(nknots)
-  mean(unlist(lapply(result, function(x) { return(x$slope.marginal[[1]]) })))
+  summary(nknots)
   
+  slopes = unlist(lapply(result, function(x) { return(x$slope.marginal[[1]]) }))
+  summary(slopes)
+  
+  sum.sigma.error = unlist(lapply(result, function(x) { return(x$sigma.error) }))
+  summary(sum.sigma.error)
+  ts.plot(sum.sigma.error)
+  
+  sum.sigma.randomIntercept = unlist(lapply(result, function(x) { return(x$sigma.randomIntercept) }))
+  summary(sum.sigma.randomIntercept)
+  ts.plot(sum.sigma.randomIntercept)
+  
+  sum.sigma.randomSlope = unlist(lapply(result, function(x) { return(x$sigma.randomSlope) }))
+  summary(sum.sigma.randomSlope)
+  ts.plot(sum.sigma.randomSlope)
+  
+  sum.sigma.randomInterceptSlope = unlist(lapply(result, function(x) { return(x$sigma.randomInterceptSlope) }))
+  summary(sum.sigma.randomInterceptSlope)
+  ts.plot(sum.sigma.randomInterceptSlope)
+  
+  
+  dropout.slopes1 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[1])}))
+  summary(dropout.slopes1)
+  ts.plot(dropout.slopes1)
 }
 
 

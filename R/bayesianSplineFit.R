@@ -216,9 +216,9 @@ removeKnot <- function(dist, knots.previous, knots.options,
   }
   
   # Calculate birth and death probabilities                                                        
-  probBirth <- ifelse(length(knots.previous) == knots.options$min, 
+  probBirth <- ifelse(length(knots.star) == knots.options$min, 
                       1, knots.options$birthProbability)
-  probDeath <- ifelse(length(knots.previous) == knots.options$max - 1, 
+  probDeath <- ifelse(length(knots.previous) == knots.options$max, 
                       1, 1 - knots.options$birthProbability)
   
   #Calculate Acceptance Probability                                                        
@@ -261,6 +261,7 @@ moveKnot <- function(dist, knots.previous, knots.stepSize, knots.candidatePositi
   knotsToKeep <- knots.previous[-index] 
   
   # find a new location from the potential knot locations
+  # TODO: floating point issue not recognizing existing knot positions
   potentialLocations <- 
     knots.candidatePositions[!(knots.candidatePositions %in% knots.previous)]
   # here we only allow movement within some small window
@@ -425,7 +426,7 @@ updateFixedEffectsCovariates <- function(dist, outcomes, covariates,
   rho<-sum(log(dnorm(as.vector(resid.star), 0, sqrt(sigma.error)))) + 
     log(dmvnorm(betaCovariates.star, rep(0, ncol(covariates)), covarIntTheta)) + 
     log(dmvnorm(betaCovariates.previous, proposedMean, proposedCovariance)) - 
-    sum(log(dnorm(residuals, 0, sqrt(sigma.error)))) - 
+    sum(log(dnorm(resid.star, 0, sqrt(sigma.error)))) - 
     log(dmvnorm(betaCovariates.previous, rep(0, ncol(covariates)), covarIntTheta)) - 
     log(dmvnorm(betaCovariates.star, proposedMean, proposedCovariance))
   
@@ -522,11 +523,13 @@ updateRandomEffects <- function(dist, numSubjects, numObservations, firstObsPerS
 #' add(1, 1)
 #' add(10, 1)
 #' 
-updateCovarianceParameters <- function(dist, totalObservations, numSubjects,
+updateCovarianceParameters <- function(dist, totalObservations, numSubjects, 
+                                       firstObsPerSubject,
                                        outcomes, covariates, X, Theta, 
                                        Z, alpha, betaCovariates,
                                        sigma.error,
                                        prior.options) {
+  
   # build the residuals
   cBeta = vector()
   for(i in 1:length(X)) {
@@ -547,15 +550,16 @@ updateCovarianceParameters <- function(dist, totalObservations, numSubjects,
   sigma.error <- 1 / rgamma(1, shape, rate)
   
   # sample from an inverse wishart to update the covariance of the random effects
+  perSubjectAlpha = alpha[firstObsPerSubject,]
   sigma.alpha <- riwish(prior.options$sigmaError.df + numSubjects, 
-                        prior.options$sigmaError.scaleMatrix + crossprod(as.matrix(alpha)))
-  
+                        prior.options$sigmaError.scaleMatrix + crossprod(as.matrix(perSubjectAlpha)))
   
   sigma.randomIntercept = sigma.alpha[1,1]
   sigma.randomSlope = sigma.alpha[2,2]
   sigma.randomInterceptSlope = sigma.alpha[1,2]
   
-  return (list(sigma.randomIntercept = sigma.alpha[1,1],
+  return (list(sigma.error = sigma.error,
+               sigma.randomIntercept = sigma.alpha[1,1],
                sigma.randomSlope = sigma.alpha[2,2],
                sigma.randomInterceptSlope = sigma.alpha[1,2]))
 }
@@ -620,7 +624,7 @@ calculateDropoutTimeSpecificSlope <- function(dropoutEstimationTimes, knotsByGro
       dropoutSpecificSlopes[[i]] <- t((spline) %*% ThetaNoInt)
       
     } else {
-      dropoutSpecificSlopes[[i]] <- rep(length(dropoutEstimationTimes), ThetaNoInt)
+      dropoutSpecificSlopes[[i]] <- rep(ThetaNoInt, length(dropoutEstimationTimes))
     } 
   }
   
