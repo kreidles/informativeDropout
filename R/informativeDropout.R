@@ -55,8 +55,63 @@ library(abind)
 informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, groups.var, 
                                                covariates.var, 
                                                times.dropout.var, times.observation.var, 
-                                               dist, knots.options, prior.options) {
+                                               dist, mcmc.options, prior.options, startValues) {
   
+  numClusters <- startValues$numClusters
+  clusterWeights <- rep(1/numClusters, numClusters)
+  
+  for (i in 2:mcmc.options$iterations) {
+    for (group.index in groupList) {
+      # Update the cluster indicator (c_i)
+      weightProd[[group.index]] <- cumprod(1 - clusterWeights)
+      pi.g0[1]<-v.g0[1]
+      for (h in 2:H) pi.g0[h]<-v.g0[h]*cumv[h-1]
+      for (h in 1:H) tmp2.g0[,h]<-pi.g0[h]*dmvnorm(betas.g0,mu.g0[h,],matrix(covar.g0, 3))
+      p.g0<-tmp2.g0/apply(tmp2.g0,1,sum)
+      
+      C.g0[i,]<-c.g0<-rMultinom(p.g0,1)
+      Pi.g0[i,]<-pi.g0
+      for (h in 1:H) ns.g0[h]<-length(c.g0[c.g0==h])  # Must allow zeros for empty clusters
+      
+      
+      # Update stick breaking weights (V_k)
+      for (h in 1:(H-1)) v.g0[h]<-rbeta(1,1+ns.g0[h],alpha.g0+sum(ns.g0[(h+1):H]))
+      V.g0[i,]<-v.g0
+      
+      ncluster.g0<-Ncluster.g0[i]<-length(ns.g0[ns.g0!=0])
+      
+      
+      
+      # sample from the stick breaking weights
+      
+      
+      # sample the means for each cluster 
+      
+      
+      # sample the covariance of the subject specific coefficients
+      
+      
+      # Update the subject specific coefficients
+      
+      
+      # Sample the hyperparameters for the baseline distribution
+      
+      
+      # Sample the concentration parameter 
+      
+      
+      # update the covariate effects
+      
+      
+      # update the scale parameters if included in the model
+      
+      
+      # calculate the marginal effects
+    }
+
+    
+
+  }
 }
 
 
@@ -503,7 +558,7 @@ test.sim <- function() {
   dist = "gaussian"
   knots.options=list(birthProbability=0.2, min=1, max=10, stepSize=0.1,
                      startPositions=c(0,7/30,0.5, 23/30,1), candidatePositions=seq(0,1,0.1/3)) 
-  mcmc.options=list(iterations=1000, burnIn=10, sigma.residual=1.25^2)
+  mcmc.options=list(iterations=40000, burnIn=10, sigma.residual=1.25^2)
   prior.options=list(shape.tau = 0.001, rate.tau = 0.001, lambda.numKnots = 5,
                      sigma.beta = 25, sigmaError.df = 3, 
                      sigmaError.scaleMatrix = diag(2))
@@ -533,6 +588,7 @@ test.sim <- function() {
   
   slopes = unlist(lapply(result, function(x) { return(x$slope.marginal[[1]]) }))
   summary(slopes)
+  ts.plot(slopes)
   
   sum.sigma.error = unlist(lapply(result, function(x) { return(x$sigma.error) }))
   summary(sum.sigma.error)
@@ -551,9 +607,17 @@ test.sim <- function() {
   ts.plot(sum.sigma.randomInterceptSlope)
   
   
-  dropout.slopes1 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[1])}))
+  dropout.slopes1 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][1])}))
   summary(dropout.slopes1)
   ts.plot(dropout.slopes1)
+  
+  dropout.slopes2 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][2])}))
+  summary(dropout.slopes2)
+  ts.plot(dropout.slopes2)
+  
+  dropout.slopes3 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][3])}))
+  summary(dropout.slopes3)
+  ts.plot(dropout.slopes3)
 }
 
 
