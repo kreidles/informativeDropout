@@ -1,3 +1,31 @@
+#
+# Supporting functions for the RJMCMC loop
+#
+#
+#
+
+#'
+#' Calculate the weighted least squares solution for non-Gaussian outcomes
+#' 
+#' 
+irls.binary <- function(y, x, covariates, eta.wls, B1, B2, nobs, niter) { 
+  prev = NULL
+  for (i in 1:niter) {
+    # get the probability from the linear predictor
+    pt <- inv.logit(eta.wls)
+    # truncate at min/max values for computational stability
+    pt[pt<0.00001]<-0.00001
+    pt[pt>0.99999]<-0.99999
+    
+    # calculate the residuals
+    ywls <- etawls-rep(B1,nobs)-t*rep(B2,nobs) + (y-pt)*(1/pt)*(1/(1-pt))
+    weight<-Diagonal(x=pt*(1-pt))
+    mnt<-solve(as.matrix(nearPD(crossprod(x,weight%*%x))$mat))%*%(crossprod(x,weight%*%ywls))
+    etawls<-as.vector(x%*%mnt)+rep(B1,nobs)+t*rep(B2,nobs)
+  }
+  return(as.vector(mnt))
+} 
+
 #' A class containing the current state of the model
 #' during a RJMCMC run
 #'
@@ -96,16 +124,22 @@ addKnot <- function(dist, knots.previous, knots.options,
   }
   zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
   
-  # get the residuals
-  yls <- as.vector(y - zAlpha)
-  if (!is.null(covariates)) {
-    yls <- (yls - cBeta)
-  } 
-  
-  # Calculate least squares estimates for coefficients and differences between LS and current coefficients
-  Theta.LSXprev <- ginv(crossprod(X.previous))%*%(crossprod(X.previous,yls))
-  Theta.LSXstar <- ginv(crossprod(X.star))%*%(crossprod(X.star,yls))
+  if (dist == 'binary') {
+    eta.wls = eta0 + zAlpha + ifelse(!is.null(covariates), cBeta, 0)
+    Theta.LSXprev <- wls(y, X.previous, eta.wls, B1, B2, nobs,1)
+    Theta.LSXstar <-wls(y, Xstar, eta.wls, B1, B2, nobs,1)
+  } else {
+    # get the residuals
+    yls <- as.vector(y - zAlpha)
+    if (!is.null(covariates)) {
+      yls <- (yls - cBeta)
+    } 
+    # Calculate least squares estimates for coefficients and differences between LS and current coefficients
+    Theta.LSXprev <- ginv(crossprod(X.previous))%*%(crossprod(X.previous,yls))
+    Theta.LSXstar <- ginv(crossprod(X.star))%*%(crossprod(X.star,yls))
+  }
   Theta.LSresid <- Theta.previous - Theta.LSXprev
+  
   
   #Draw a residual for the added coefficient and calculate coefficient transformation
   residual <- rnorm(1, 0, sqrt(sigma.residual))
@@ -122,29 +156,54 @@ addKnot <- function(dist, knots.previous, knots.options,
                    beta.other[(newKnot.position+1):length(beta.other)])
   }
   
-  # Calculate residuals for likelihood ratio
-  if (!is.null(covariates)) {
-    LRresid.star <- as.vector(y - X.star %*% Theta.star - cBeta - zAlpha)
-    LRresid.prev <- as.vector(y - X.previous %*% Theta.previous - cBeta - zAlpha)
-  } else {
-    LRresid.star <-as.vector(y - X.star %*% Theta.star - zAlpha)
-    LRresid.prev <- as.vector(y - X.previous %*% Theta.previous - zAlpha)
-  }
-  
   # Calculate birth and death probabilities                                                        
   probBirth <- ifelse(length(knots.previous) == knots.options$min, 1, knots.options$birthProbability)
   probDeath <- ifelse(length(knots.previous) == knots.options$max - 1, 1, 1 - knots.options$birthProbability)
   
-  #Calculate Acceptance Probability                                                        
-  rho <- (log(lambda.numKnots) - 
-            log(length(knots.previous)) + 
-            log(probDeath) - log(probBirth) + 
-            log(sqrt(sigma.residual)) - 
-            0.5 * log(sigma.beta) +
-            (residual^2 / (2 * sigma.residual)) + 
-            ((crossprod(Theta.previous) - crossprod(Theta.star)) / (2 * sigma.beta)) +
-            ((crossprod(LRresid.prev) - crossprod(LRresid.star)) / (2 * sigma.error))
-  )
+  # Calculate residuals for likelihood ratio
+  if (dist == 'gaussian') {
+    if (!is.null(covariates)) {
+      LRresid.star <- as.vector(y - X.star %*% Theta.star - cBeta - zAlpha)
+      LRresid.prev <- as.vector(y - X.previous %*% Theta.previous - cBeta - zAlpha)
+    } else {
+      LRresid.star <-as.vector(y - X.star %*% Theta.star - zAlpha)
+      LRresid.prev <- as.vector(y - X.previous %*% Theta.previous - zAlpha)
+    }
+    
+    #Calculate Acceptance Probability                                                        
+    rho <- (log(lambda.numKnots) - 
+              log(length(knots.previous)) + 
+              log(probDeath) - log(probBirth) + 
+              log(sqrt(sigma.residual)) - 
+              0.5 * log(sigma.beta) +
+              (residual^2 / (2 * sigma.residual)) + 
+              ((crossprod(Theta.previous) - crossprod(Theta.star)) / (2 * sigma.beta)) +
+              ((crossprod(LRresid.prev) - crossprod(LRresid.star)) / (2 * sigma.error))
+    )
+  } else if (dist == 'binary') {
+    # calculate the residuals -- TODO
+    if (!is.null(covariates)) {
+      LRresid.star <- as.vector(y - X.star %*% Theta.star - cBeta - zAlpha)
+      LRresid.prev <- as.vector(y - X.previous %*% Theta.previous - cBeta - zAlpha)
+    } else {
+      LRresid.star <-as.vector(y - X.star %*% Theta.star - zAlpha)
+      LRresid.prev <- as.vector(y - X.previous %*% Theta.previous - zAlpha)
+    }
+    #Calculate Acceptance Probability                                                        
+    rho <- (log(lambda.numKnots) - 
+              log(length(knots.previous)) + 
+              log(probDeath) - log(probBirth) + 
+              log(sqrt(sigma.residual)) - 
+              0.5 * log(sigma.beta) +
+              (residual^2 / (2 * sigma.residual)) + 
+              ((crossprod(Theta.previous) - crossprod(Theta.star)) / (2 * sigma.beta)) +
+              ((crossprod(LRresid.prev) - crossprod(LRresid.star)) / (2 * sigma.error))
+    )
+  }
+
+  
+
+
   
   if (rho > log(runif(1))) {
     return (list(X=X.star, knots=knots.star, Theta=Theta.star, accepted=TRUE))
@@ -411,7 +470,7 @@ updateFixedEffectsCovariates <- function(dist, outcomes, covariates,
   proposedCovariance <- proposedCovariance * 
     ifelse(!is.null(mcmc.options$fixedEffectAcceptRateAdjust), 
            mcmc.options$fixedEffectAcceptRateAdjust, 1)
-
+  
   # ensure the covariance is positive definite
   proposedCovariance <- as.matrix(nearPD(proposedCovariance)$mat) 
   
@@ -421,7 +480,7 @@ updateFixedEffectsCovariates <- function(dist, outcomes, covariates,
   # calculate the residuals
   resid.star <- residuals - covariates.matrix %*% t(betaCovariates.star)
   resid.previous <- residuals - covariates.matrix %*% (as.matrix(betaCovariates.previous))
-
+  
   # calculate the acceptance probability
   rho<-sum(log(dnorm(as.vector(resid.star), 0, sqrt(sigma.error)))) + 
     log(dmvnorm(betaCovariates.star, rep(0, ncol(covariates)), covarIntTheta)) + 

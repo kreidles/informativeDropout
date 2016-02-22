@@ -129,11 +129,11 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   }
   
   if (dist == 'gaussian') {
-    if (is.na(prior.options$sigma.error.mu)) {
-      stop("Prior options error :: invalid mean (hyperparameter) for the error variance")
+    if (is.na(prior.options$sigma.error.tau1)) {
+      stop("Prior options error :: invalid tau1 (hyperparameter) for the error variance")
     }
-    if (is.na(prior.options$sigma.error.sigma)) {
-      stop("Prior options error :: invalid variance (hyperparameter) for the error variance")
+    if (is.na(prior.options$sigma.error.tau2)) {
+      stop("Prior options error :: invalid tau2 (hyperparameter) for the error variance")
     }
   }
   
@@ -458,29 +458,48 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         prior.options$dp.cluster.sigma.T0 + crossprod(group.betas.deviations)
       )
 
-      ## update the betas for covariates
+      ### Update the hyprparameters of the baseline distribution of 
+      ### the Dirichlet process (Step 6)
+      # update the mean
+      sigma0.inv = solve(dp.dist.sigma0)
+      Sb.inv = solve(prior.options$dp.dist.mu0.Sb)
+      var = solve(Sb.inv + numNonEmptyClusters * sigma0.inv)
+      if (numNonEmptyClusters == 1) {
+        m <- var %*% (Sb.inv %*% prior.options$dp.dist.mu0.mb + 
+                        sigma0.inv %*% ((model.current$clusterMeans[perClusterN > 0,])) )
+      } else {
+        m <- var %*% (prior.options$dp.dist.mu0.Sb %*% mb0 + 
+                        sigma0.inv %*% (colSums(model.current$clusterMeans[[group.index]][perClusterN > 0,])) )
+      }
+      model.current$dp.dist.mu0[[group.index]] = rmvnorm(1,m,var)
       
+      # update the variance of the baseline distribution
+      model.current$dp.dist.sigma0[[group.index]] = riwish(
+        prior.options$dp.dist.sigma0.nub + numNonEmptyClusters,
+        prior.options$dp.dist.sigma0.Tb + 
+          crossprod(model.current$clusterMeans[[group.index]][perClusterN > 0,] - 
+                      matrix(rep(model.current$dp.dist.mu0[[group.index]],ncluster), 
+                             numNonEmptyClusters, byrow=T))
+      )
       
-      
+      if (dist = "gaussian") {
+        # Step 9 Update sigma.error with inverse gamma
+        residual = (group.data[, outcomes.var] - 
+                      (Z[,1] * alpha[,1] + Z[,2] * alpha[,2]) -
+                      ifelse(is.null(covariates), 
+                             as.vector(as.matrix(group.data[,covariates.var]) %*% 
+                                         model.current$betas.covariates[[group.index]]), 
+                             0))
+        g <- prior.options$sigma.error.tau1 + crossprod(residual)/2
+        tau <- rgamma(1, prior.options$sigma.error.tau1 + group.N / 2, g)
+        model.current$sigma.error[[group.index]] = 1 / tau
+      }
+
       #Estimate Density of Slope - for plotting density of the random slope (output only)    
       # Equation 19
       #Estimate slope at each dropout time
       
       #Estimate E(B1), E(B0) - section 2.4 expectation of random effects (int, slope)
-      
-      
-      # Step 9
-      #Update error with inverse gamma
-      # Update tau  
-      
-      
-      # Step 6
-      #Update hyperparameters if using...maybe a good idea for mean and variance of baseline distribution
-      #update m0
-      
-      
-      # Step 6 - parameters of the baseline distribution of the dirichlet process
-      #tau[h]<-rgamma(1,a+ns[h]/2,b+sum((betas[c==h]-mu[h])^2)/2) #Here insert riwish for cluster covariance
       
       
       # end of group specific part of loop
@@ -534,16 +553,10 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     
     # update fixed effects associated with covariates
     
-    # update random effects
+
     
-    # update variance components
-    
-    # calculate marginal slope
-    
-    # calculate dropout time specific slopes
-    
-    # save the current iteration
-  }
+
+  } # END ITERATION LOOP
 }
     
 
@@ -678,6 +691,14 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   # use a simple linear model fit to obtain initial estimates for the
   # covariate coefficients
   betaCovariate.init = getInitialEstimatesCovariates(dist, covariates, outcomes)
+  
+  # for binary case, initialize eta
+  if (dist == 'binary') {
+    eta.null = lapply(subjectsPerGroup, function(N) {
+      return(logit(rep(sum(y)/N, N)))
+    })
+  }
+
   
   # initialize the first model iteration
   # TODO: mcmc options specify starting values
