@@ -5,7 +5,10 @@
 #
 
 dirichlet.iteration <- function(mixingWeights=NULL, conditionalWeights=NULL,
-                                betas = NULL, betas.covariates = NULL, 
+                                betas = NULL, 
+                                betas.covariates = NULL, 
+                                betas.covariates.mu = NULL,
+                                betas.covariates.sigma = NULL,
                                 betas.deviations = NULL,
                                 perClusterN = NULL,
                                 dp.dist.mu0 = NULL, dp.dist.sigma0 = NULL,
@@ -78,6 +81,9 @@ test.sim <- function() {
                      dp.concentration.beta=1,
                      dp.cluster.sigma.nu0 = 5,
                      dp.cluster.sigma.T0 = diag(3),
+                     betas.covariates.mu = NULL,
+                     betas.covariates.sigma = NULL,
+                     
     shape.tau = 0.001, rate.tau = 0.001, lambda.numKnots = 5,
                      sigma.beta = 25, sigmaError.df = 3, 
                      sigmaError.scaleMatrix = diag(2))

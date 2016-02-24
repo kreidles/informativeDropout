@@ -128,6 +128,21 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     stop("Prior options error :: invalid scale matrix (hyperparameter) for the cluster-specific variance of the Dirichlet process")
   }
   
+  # prior for covariate effects
+  if (!is.null(covariates.var)) {
+    if (is.na(prior.options$betas.covariates.mu) || 
+        length(prior.options$betas.covariates.mu) != length(covariates.var)) {
+      stop("Prior options error :: invalid prior mean for fixed effects related to covariates")
+    }
+    if (is.na(prior.options$betas.covariates.R0) || 
+        !is.matrix(prior.options$betas.covariates.R0) ||
+        nrow(prior.options$betas.covariates.R0) != length(covariates.var) || 
+        ncol(prior.options$betas.covariates.R0) != length(covariates.var) ||
+        !is.positive.definite(prior.options$betas.covariates.R0)) {
+      stop("Prior options error :: invalid prior variance for fixed effects related to covariates")
+    }
+  }
+  
   if (dist == 'gaussian') {
     if (is.na(prior.options$sigma.error.tau1)) {
       stop("Prior options error :: invalid tau1 (hyperparameter) for the error variance")
@@ -493,21 +508,11 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         g <- prior.options$sigma.error.tau1 + crossprod(residual)/2
         tau <- rgamma(1, prior.options$sigma.error.tau1 + group.N / 2, g)
         model.current$sigma.error[[group.index]] = 1 / tau
+      } else {
+        
       }
 
-      #Estimate Density of Slope - for plotting density of the random slope (output only)    
-      # Equation 19
-      #Estimate slope at each dropout time
-      
-      #Estimate E(B1), E(B0) - section 2.4 expectation of random effects (int, slope)
-      
-      
-      # end of group specific part of loop
-      
-
-      ###### CAMILLE STUFF
-      
-      #Estimate Density of Slope - for plotting density of the random slope (output only)    
+      #Estimate Density of Slope - for plotting density of the random slope (output only)  
       tmp5<-tmp6<-NULL
       for(h in 1:H){tmp5<-rbind(tmp5,pi[h]*dnorm(grid, mu[h,2], sqrt(Sigma.b[2,2])))
       tmp6<-rbind(tmp6,pi[h]*dnorm(grid, mu[h,1], sqrt(Sigma.b[1,1])))
@@ -525,34 +530,21 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       expected.zz1[i]<-sum(pi*mu[,2])
       expected.zz0[i]<-sum(pi*mu[,1])
       
-      # Step 9
-      #Update error with inverse gamma
-      # Update tau  
-      g<-g0+crossprod(y-rep(betas[,1],nobs)-t*rep(betas[,2],nobs))/2
-      tau<-rgamma(1,d0+N/2,g)
-      Sigma[i]<-1/tau
-      
-      # Step 6
-      #Update hyperparameters if using...maybe a good idea for mean and variance of baseline distribution
-      #update m0
-      var<-solve(sb0+ncluster*solve(t0))
-      if(ncluster==1){m<-var%*%(sb0%*%mb0+solve(t0)%*%((mu[ns !=0,])) )
-      }else{m<-var%*%(sb0%*%mb0+solve(t0)%*%(colSums(mu[ns !=0,])) )}
-      Mu0[i,]<-mu0<-rmvnorm(1,m,var)
-      
-      # Step 6 - parameters of the baseline distribution of the dirichlet process
-      #tau[h]<-rgamma(1,a+ns[h]/2,b+sum((betas[c==h]-mu[h])^2)/2) #Here insert riwish for cluster covariance
-      t0<-riwish(nu0+ncluster,tb0+crossprod(mu[ns!=0, ]-matrix(rep(mu0,ncluster),ncluster, byrow=T)))
-      V0[i,]<-c(t0)
-      
-      
-      
-      
     } # END GROUP-SPECIFIC UPDATE LOOP
       
     
     # update fixed effects associated with covariates
-    
+    if (dist == "gaussian") {
+      sigma.inv = solve(model.current$beta.covariates.sigma)
+      prior.sigma.inv = solve(prior.options$betas.covariates.sigma)
+      var = solve(prior.sigma.inv + numSubjects * sigma.inv)
+      m <- var %*% (prior.sigma.inv %*% prior.options$betas.covariates.mu + 
+                      sigma.inv %*% (colSums()) )
+      model.current$betas.covariates = rmvnorm(1,m,var)
+      
+    } else {
+      # metropolis hastings
+    }
 
     
 
