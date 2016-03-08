@@ -466,10 +466,13 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       model.current$betas[[group.index]] = group.betas
       model.current$betas.deviations[[group.index]] = group.betas.deviations
       
+      
+      #### TODO: add flag to indicate if cluster covariance is updated per group
+      ## or updated across groups
       # Common covariance for each cluster (Step 4)
       # Update Cluster Covariance
       model.current$dp.cluster.sigma[[group.index]] = riwish(
-        prior.options$dp.cluster.sigma.nu0 + nsub,
+        prior.options$dp.cluster.sigma.nu0 + group.N, # <- check typo
         prior.options$dp.cluster.sigma.T0 + crossprod(group.betas.deviations)
       )
 
@@ -497,21 +500,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
                              numNonEmptyClusters, byrow=T))
       )
       
-      if (dist = "gaussian") {
-        # Step 9 Update sigma.error with inverse gamma
-        residual = (group.data[, outcomes.var] - 
-                      (Z[,1] * alpha[,1] + Z[,2] * alpha[,2]) -
-                      ifelse(is.null(covariates), 
-                             as.vector(as.matrix(group.data[,covariates.var]) %*% 
-                                         model.current$betas.covariates[[group.index]]), 
-                             0))
-        g <- prior.options$sigma.error.tau1 + crossprod(residual)/2
-        tau <- rgamma(1, prior.options$sigma.error.tau1 + group.N / 2, g)
-        model.current$sigma.error[[group.index]] = 1 / tau
-      } else {
-        
-      }
-
+      
       #Estimate Density of Slope - for plotting density of the random slope (output only)  
       tmp5<-tmp6<-NULL
       for(h in 1:H){tmp5<-rbind(tmp5,pi[h]*dnorm(grid, mu[h,2], sqrt(Sigma.b[2,2])))
@@ -531,15 +520,29 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       expected.zz0[i]<-sum(pi*mu[,1])
       
     } # END GROUP-SPECIFIC UPDATE LOOP
-      
+     
+    if (dist = "gaussian") {
+      ## TODO: remove group specific variables, use betas (random effects)
+      # Step 9 Update sigma.error with inverse gamma
+      residual = (group.data[, outcomes.var] - 
+                    (Z[,1] * alpha[,1] + Z[,2] * alpha[,2]) -  
+                    ifelse(is.null(covariates), 
+                           as.vector(as.matrix(group.data[,covariates.var]) %*% 
+                                       model.current$betas.covariates[[group.index]]), 
+                           0))
+      g <- prior.options$sigma.error.tau1 + crossprod(residual)/2
+      tau <- rgamma(1, prior.options$sigma.error.tau1 + group.N / 2, g)
+      model.current$sigma.error[[group.index]] = 1 / tau
+    } 
     
     # update fixed effects associated with covariates
     if (dist == "gaussian") {
-      sigma.inv = solve(model.current$beta.covariates.sigma)
+      sigma.error.inv = 1/model.current$sigma.error
       prior.sigma.inv = solve(prior.options$betas.covariates.sigma)
-      var = solve(prior.sigma.inv + numSubjects * sigma.inv)
-      m <- var %*% (prior.sigma.inv %*% prior.options$betas.covariates.mu + 
-                      sigma.inv %*% (colSums()) )
+      var = solve(prior.sigma.inv + crossprod(data[,covariates.var]) * sigma.error.inv)
+      residuals = data[, outcomes.var] - model.current$betas[,1] - 
+        model.current$betas[,2] * data[, times.observation.var]
+      m <- var %*% (crossprod(data[, covariates.var], residuals) * sigma.error.inv)
       model.current$betas.covariates = rmvnorm(1,m,var)
       
     } else {
