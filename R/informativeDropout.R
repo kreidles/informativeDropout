@@ -54,80 +54,17 @@ library(Hmisc)
 informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, groups.var, 
                                                covariates.var, 
                                                times.dropout.var, times.observation.var, 
-                                               dist, mcmc.options, prior.options, 
-                                               startValues=NULL) {
+                                               dist, model.options, prior.options) {
   
-  # validate the mcmc options
-  if (is.na(mcmc.options$iterations) || mcmc.options$iterations <= 1) {
-    stop("MCMC options error :: invalid number of iterations")
-  }
-  if (is.na(mcmc.options$burnIn) || mcmc.options$burnIn >= mcmc.options$iterations) {
-    stop("MCMC options error :: the burn in period must be less than the total number of iterations")
-  }
-  if (is.na(mcmc.options$numClusters) || mcmc.options$numClusters <= 1) {
-    stop("MCMC options error :: invalid number of clusters")
+  # make sure we have the correct type of mcmc opts
+  if (!is(model.options,"dirichlet.model.options")) {
+    stop("Model options error :: options must be of type dirichlet.model.options")
   }
   
-  # validate the prior options
-  # Dirichlet process details
-  if (is.na(prior.options$dp.concentration) || prior.options$dp.concentration <= 0) {
-    stop("Prior options error :: invalid concentration parameter for the Dirichlet process")
+  # perform some additional validation on the priors
+  if (!is(prior.options,"dirichlet.prior.options")) {
+    stop("Prior options error :: options must be of type dirichlet.prior.options")
   }
-  if (is.na(prior.options$dp.concentration.alpha) || prior.options$dp.concentration.alpha <= 0) {
-    stop("Prior options error :: invalid gamma prior for the Dirichlet process concentration parameter")
-  }
-  if (is.na(prior.options$dp.concentration.beta) || prior.options$dp.concentration.beta <= 0) {
-    stop("Prior options error :: invalid gamma prior for the Dirichlet process concentration parameter")
-  }
-  # priors for baseline distribution of the Dirichlet process
-  # mean of the baseline distribution
-  if (is.na(prior.options$dp.dist.mu0)) {
-    stop("Prior options error :: invalid mean for the Dirichlet process baseline distribution")
-  }
-  # hyperparams for the mean of the baseline distribution
-  if (is.na(prior.options$dp.dist.mu0.mb)) {
-    stop("Prior options error :: invalid mean (hyperparameter) for the mean of the Dirichlet process baseline distribution")
-  }
-  if (is.na(prior.options$dp.dist.mu0.Sb) || 
-      !is.matrix(prior.options$dp.dist.mu0.Sb) ||
-      nrow(prior.options$dp.dist.mu0.Sb) != 3 || ncol(prior.options$dp.dist.mu0.Sb) != 3 ||
-      !is.positive.definite(prior.options$dp.dist.mu0.Sb)) {
-    stop("Prior options error :: invalid variance (hyperparameter) for the mean of the Dirichlet process baseline distribution")
-  }
-  
-  # variance of the baseline distribution
-  if (is.na(prior.options$dp.dist.sigma0)) {
-    stop("Prior options error :: no variance for the Dirichlet process baseline distribution")
-  }
-  # hyperparameters of the variance of the baseline distribution
-  if (is.na(prior.options$dp.dist.sigma0.nub)) {
-    stop("Prior options error :: invalid df (hyperparameter) for the variance of the Dirichlet process baseline distribution")
-  }
-  if (is.na(prior.options$dp.dist.sigma0.Tb) || 
-      !is.matrix(prior.options$dp.dist.sigma0.Tb) ||
-      nrow(prior.options$dp.dist.sigma0.Tb) != 3 || ncol(prior.options$dp.dist.sigma0.Tb) != 3 ||
-      !is.positive.definite(prior.options$dp.dist.sigma0.Tb)) {
-    stop("Prior options error :: invalid scale matrix (hyperparameter) for the variance of the Dirichlet process baseline distribution")
-  }
-  
-  # cluster specific variance for the Dirichlet process
-  if (is.na(prior.options$dp.cluster.sigma) || 
-      !is.matrix(prior.options$dp.cluster.sigma) ||
-      nrow(prior.options$dp.cluster.sigma) != 3 || ncol(prior.options$dp.cluster.sigma) != 3 ||
-      !is.positive.definite(prior.options$dp.cluster.sigma)) {
-    stop("Prior options error :: invalid cluster-specific variance for the Dirichlet process")
-  }
-  # hyperparameters of the cluster specific variance
-  if (is.na(prior.options$dp.cluster.sigma.nu0)) {
-    stop("Prior options error :: invalid df (hyperparameter) for the cluster-specific variance of the Dirichlet process")
-  }
-  if (is.na(prior.options$dp.cluster.sigma.T0) || 
-      !is.matrix(prior.options$dp.cluster.sigma.T0) ||
-      nrow(prior.options$dp.cluster.sigma.T0) != 3 || ncol(prior.options$dp.cluster.sigma.T0) != 3 ||
-      !is.positive.definite(prior.options$dp.cluster.sigma.T0)) {
-    stop("Prior options error :: invalid scale matrix (hyperparameter) for the cluster-specific variance of the Dirichlet process")
-  }
-  
   # prior for covariate effects
   if (!is.null(covariates.var)) {
     if (is.na(prior.options$betas.covariates.mu) || 
@@ -144,31 +81,32 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   }
   
   if (dist == 'gaussian') {
-    if (is.na(prior.options$sigma.error.tau1)) {
+    if (is.null(prior.options$sigma.error.tau1)) {
       stop("Prior options error :: invalid tau1 (hyperparameter) for the error variance")
     }
-    if (is.na(prior.options$sigma.error.tau2)) {
+    if (is.null(prior.options$sigma.error.tau2)) {
       stop("Prior options error :: invalid tau2 (hyperparameter) for the error variance")
     }
   }
   
+  
   ## reorder the data and cache information on the groups and subjects
   # number of clusters
-  numClusters <- mcmc.options$numClusters
+  n.clusters <- model.options$n.clusters
   # reorder by group, subject, and observation time
   data <- data[order(data[,groups.var], data[,ids.var], data[,times.observation.var]),]
   rownames(data) <- NULL
   # get the list of treatment groups
   groupList <- unique(data[,groups.var])
   # number of subjects
-  numSubjects = length(unique(data[,ids.var]))
+  n.subjects = length(unique(data[,ids.var]))
   # number of subjects per group
-  subjectsPerGroup = lapply(groupList, function(group) { 
+  n.perGroup = lapply(groupList, function(group) { 
     # get the covariates
     return(length(unique(data[data[,groups.var] == group, ids.var])))
   })
   # number of observations per subject
-  numObservationsPerGroup = lapply(groupList, function(group) {
+  nobj.perGroup = lapply(groupList, function(group) {
     group.data = data[data[,groups.var] == group, ]
     return(sapply(unique(group.data[,ids.var]), function(id) {
       return(nrow(group.data[group.data[,ids.var] == id,]))
@@ -176,19 +114,27 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   })
   ## set starting values
   # mixing weights
-  mixingWeights = lapply(groupList, function(group) {
-    weights = rep(0, numClusters)
-    return(weights)
-  })
+  if (!is.null(model.options$start.weights.mixing)) {
+    weights.mixing = lapply(groupList, function(group) {
+      weights = rep(0, n.clusters)
+      return(weights)
+    })
+  } else {
+    weights.mixing = lapply(groupList, function(group) {
+      weights = rep(0, n.clusters)
+      return(weights)
+    })
+  }
+  
   # number of subjects in each cluster
-  subjectsPerCluster = lapply(groupList, function(group) {
-    numSubjects = rep(0, numClusters)
-    return(numSubjects)
+  n.perCluster = lapply(groupList, function(group) {
+    n.subjects = rep(0, n.clusters)
+    return(n.subjects)
   }) 
   # Conditional weights -- pr(c_i=h|c_i not in l<h)
-  conditionalWeights = lapply(groupList, function(group) {
-    weights = rep(1/numClusters, numClusters)
-    weights[numClusters] = 1 # Apply DP truncation to last cluster
+  weights.conditional = lapply(groupList, function(group) {
+    weights = rep(1/n.clusters, n.clusters)
+    weights[n.clusters] = 1 # Apply DP truncation to last cluster
     return(weights)
   })
   
@@ -196,20 +142,27 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   concentration = lapply(groupList, function(group) {
     return(prior.options$dp.concentration)
   })
-
+  
   # initialize cluster specific means
-  clusterMeans = lapply(groupList, function(group) {
-    means = matrix(0,numClusters,3)
+  cluster.means = lapply(groupList, function(group) {
+    means = matrix(0,n.clusters,3)
     return(means)
   })
   # initialize the cluster specific variance
-  clusterCovariance = lapply(groupList, function(group) {
-    covar = diag(3)
+  cluster.sigma = lapply(groupList, function(group) {
+    covar = prior.options$dp.cluster.sigma
     return(covar)
   })
+  # initialize the slope estimates at each droptime
+  start.slope.dropoutTimes = NULL
+  if (!is.null(model.options$dropout.estimationTimes)) {
+    start.slope.dropoutTimes = lapply(groupList, function(group) {
+      return (matrix(0,length(model.options$dropout.estimationTimes), n.clusters))
+    })
+  }
   
   # initialize the regression coefficients for the random intercept
-  # and slope.  We append the log of the 
+  # and slope.  We append the log of the dropout time
   betas = lapply(groupList, function(group) {
     N = length(unique(data[data[,groups.var] == group, ids.var]))
     logDropout = log(unique(data[data[,groups.var] == group, ids.var]))
@@ -221,58 +174,58 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     return(cbind(intercept.dev=rep(0,N), slope.dev=rep(0,N), logDropout.dev=rep(0,N)))
   })
   
-  # covariate coefficients -- TODO
-  betaCovariate.init = NULL
+  # covariate coefficients 
+  start.betas.covariates = NULL
   if (!is.null(covariates.var)) {
-    betaCovariate.init = getInitialEstimatesCovariates(dist, 
-                                                       as.data.frame(data[,covariates.var]), 
-                                                       data[,outcomes.var])
+    if (!is.null(prior.options$betas.covariates)) {
+      start.betas.covariates = prior.options$betas.covariates
+    } else {
+      start.betas.covariates = getInitialEstimatesCovariates(dist, 
+                                                             as.data.frame(data[,covariates.var]), 
+                                                             data[,outcomes.var])
+    }
   }
-
   
-  
-  # what is this?
-  # posterior probabilities
-  posteriorClusterProb = lapply(subjectsPerGroup, function(nPerGroup) {
-    return(matrix(0, nPerGroup, numClusters))
-  })
-
   # starting values for the mean and variance of the Dirichlet baseline distribution
   dp.dist.mu0 = lapply(groupList, function(group) {
-    return(c(0,0,0.5))
+    return(prior.options$dp.dist.mu0)
   })
   dp.dist.sigma0 = lapply(groupList, function(group) {
-    covar = diag(3)
-    return(covar)
+    return(prior.options$dp.dist.sigma0)
   })
   # starting values for the common cluster variance
   dp.cluster.sigma = lapply(groupList, function(group) {
-    covar = diag(3)
-    return(covar)
+    return(prior.options$dp.cluster.sigma)
   })
   
   # for Gaussian outcomes, the residual error
-  sigma.error = lapply(groupList, function(group) {
-    return(1)
-  })
+  if (dist == "gaussian") {
+    sigma.error = lapply(groupList, function(group) {
+      return(prior.options$sigma.error)
+    })
+  }
+  
   
   # initialize the first model iteration
-  modelIterationList <- vector(mode = "list", length = mcmc.options$iterations)
+  modelIterationList <- vector(mode = "list", length = model.options$iterations)
   modelIterationList[[1]] = dirichlet.iteration(
-    mixingWeights=mixingWeights, 
-    conditionalWeights=conditionalWeights,
-    betas = betas, betas.covariates = betaCovariate.init,
+    weights.mixing=weights.mixing, 
+    weights.conditional=weights.conditional,
+    betas = betas, 
+    betas.covariates = start.betas.covariates, 
+    betas.covariates.mu = prior.options$betas.covariates.mu,
+    betas.covariates.sigma = prior.options$betas.covariates.sigma,
     betas.deviations = betas.deviations,
-    perClusterN=subjectsPerCluster,
-    dp.dist.mu0 = dp.dist.mu0,
-    dp.dist.sigma0 = dp.dist.sigma0,
+    dp.dist.mu0 = dp.dist.mu0, dp.dist.sigma0 = dp.dist.sigma0,
     dp.cluster.sigma = dp.cluster.sigma,
-    clusterMeans=clusterMeans, clusterCovariance=clusterCovariance, 
+    dp.concentration=concentration, 
+    cluster.N = n.perCluster,
+    cluster.mu=cluster.means, 
     expected.intercept=NULL, expected.slope=NULL,
-    concentration=concentration, 
+    slope.dropoutTimes = start.slope.dropoutTimes,
     sigma.error = sigma.error
   )
-
+  
   for (i in 2:mcmc.options$iterations) {
     
     print(paste("ITER = ", i, sep=""))
@@ -287,64 +240,67 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       # get the subset of data for this group
       group.data = data[data[,groups.var] == group,]
       # convenience variables for the group specific information
-      group.N = subjectsPerGroup[[group.index]]
-      group.nobs = numObservationsPerGroup[[group.index]]
-      group.conditionalWeights = model.current$conditionalWeights[[group.index]]
+      group.n = n.perGroup[[group.index]]
+      group.nobs = nobj.perGroup[[group.index]]
+      group.weights.conditional = model.current$weights.conditional[[group.index]]
       group.betas = model.current$betas[[group.index]]
       group.betas.deviations = model.current$betas.deviations[[group.index]]
       group.beta.covariates = model.current$beta.covariates[[group.index]]
-      group.clusterMeans = model.current$clusterMeans[[group.index]]
-      group.clusterCovariance = model.current$clusterCovariance[[group.index]]
+      group.cluster.mu = model.current$cluster.mu[[group.index]]
+      group.dp.cluster.sigma = model.current$dp.cluster.sigma[[group.index]]
       group.dp.dist.mu0 = model.current$dp.dist.mu0[[group.index]]
       group.dp.dist.sigma0 = model.current$dp.dist.sigma0[[group.index]]
       group.dp.cluster.sigma = model.current$dp.cluster.sigma[[group.index]]
-      group.sigma.error = model.current$sigma.error[[group.index]]
+      if (dist == "gaussian") {
+        group.sigma.error = model.current$sigma.error[[group.index]]
+      }
+      
       # calculate the overall probability of belonging to a cluster (length = #clusters)
-      cumulative.conditionalWeights <- cumprod(1 - group.conditionalWeights)
-      model.current$mixingWeights[[group.index]] = sapply(1:numClusters, function(i) {
+      cumulative.weights.conditional <- cumprod(1 - group.weights.conditional)
+      model.current$weights.mixing[[group.index]] = sapply(1:n.clusters, function(i) {
         if (i <= 1) {
-          return(group.conditionalWeights[i])
+          return(group.weights.conditional[i])
         } else {
-          return(group.conditionalWeights[i]*cumulative.conditionalWeights[i-1])
+          return(group.weights.conditional[i]*cumulative.weights.conditional[i-1])
         }
       })
-      group.mixingWeights = model.current$mixingWeights[[group.index]]
+      group.weights.mixing = model.current$weights.mixing[[group.index]]
       
       # calculate the probability that each individual belongs to a cluster (#subjects x #clusters)
       # overall cluster prob * normal density (mean by cluster, common covariance) 
       # at subject specific int,slope, log(u)
-      clusterProbabilities = sapply(1:numClusters, function(h) {
-        return(group.mixingWeights[h] * dmvnorm(group.betas,
-                                                group.clusterMeans[h,],
-                                                group.clusterCovariance))
+      clusterProbabilities = sapply(1:n.clusters, function(h) {
+        return(group.weights.mixing[h] * dmvnorm(group.betas,
+                                                 group.cluster.mu[h,],
+                                                 group.dp.cluster.sigma))
       })
       # Build multinomial probabilities (Equation from step 1, Appendix A)
       prob = (clusterProbabilities / apply(clusterProbabilities,1,sum))
       # draw from multinomial to determine which cluster the individual belongs to
       # C is the cluster indicator
-      group.clusterAssignments = rMultinom(prob, 1)
-      model.current$clusterAssignments[[group.index]] = group.clusterAssignments
+      group.cluster.assignments = rMultinom(prob, 1)
+      model.current$cluster.assignments[[group.index]] = group.cluster.assignments
       
       # calculate/save the number of people in each cluster
       # Must allow zeros for empty clusters
-      model.current$perClusterN[[group.index]] = sapply(1:numClusters, function(h) {
-        return(length(group.clusterAssignments[group.clusterAssignments==h]))
+      model.current$cluster.N[[group.index]] = sapply(1:n.clusters, function(h) {
+        return(length(group.cluster.assignments[group.cluster.assignments==h]))
       })
-      perClusterN = model.current$perClusterN[[group.index]]
+      group.cluster.N = model.current$cluster.N[[group.index]]
       
       # Update the stick breaking weights, drawn from beta distributions (Step 2 appendix A)
-      model.current$conditionalWeights[[group.index]] = sapply(1:(numClusters), function(h) {
-        if (h < numClusters) {
-          return(rbeta(1, 1 + perClusterN[h], 
-                       prior.options$dp.concentration + sum(perClusterN[(h+1):numClusters])))
+      model.current$weights.conditional[[group.index]] = sapply(1:(n.clusters), function(h) {
+        if (h < n.clusters) {
+          return(rbeta(1, 1 + group.cluster.N[h], 
+                       prior.options$dp.concentration + sum(group.cluster.N[(h+1):n.clusters])))
         } else {
-          return(rbeta(1, 1 + perClusterN[h], prior.options$dp.concentration))
+          return(rbeta(1, 1 + group.cluster.N[h], prior.options$dp.concentration))
         }
       })
       
       # number of clusters that have at least one subject (common to have empty clusters)
-      numNonEmptyClusters = length(perClusterN[perClusterN != 0])
-
+      numNonEmptyClusters = length(group.cluster.N[group.cluster.N != 0])
+      
       # Alpha is concentration parameter of the dirichlet process (step 7)
       # sample latent beta distributed variable (Escobar and West 1995)
       eta <- rbeta(1, prior.options$dp.concentration + 1, group.N)
@@ -355,29 +311,28 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       # now draw the new concentration parameter for the Dirichlet process
       model.current$concentration[[group.index]] <- 
         ((pi.eta * rgamma(1, prior.options$dp.concentration.alpha + numNonEmptyClusters, 
-                         prior.options$dp.concentration.beta - log(eta))) + 
+                          prior.options$dp.concentration.beta - log(eta))) + 
            ((1 - pi.eta) * rgamma(1, prior.options$dp.concentration.alpha + numNonEmptyClusters - 1, 
                                   prior.options$dp.concentration.beta - log(eta))))
-
+      
       # Update cluster means and covariances (density estimate)
       # assumes common covariance across clusters but potentially different means
       dp.dist.sigma0.inv = solve(group.dp.dist.sigma0)
       dp.cluster.sigma.inv = solve(group.dp.cluster.sigma)
       
-      for (h in 1:numClusters) {
-        cat ("CLUSTER: ", h, "\n")
+      for (h in 1:n.clusters) {
         # calculate the means per cluster (Step 3)
-        S <- solve(dp.dist.sigma0.inv + perClusterN[h] * dp.cluster.sigma.inv)
-        if (perClusterN[h] == 1) {
+        S <- solve(dp.dist.sigma0.inv + group.cluster.N[h] * dp.cluster.sigma.inv)
+        if (group.cluster.N[h] == 1) {
           m <- S %*% (dp.dist.sigma0.inv %*% group.dp.dist.mu0 + 
-                        dp.cluster.sigma.inv %*% ((group.betas[group.clusterAssignments==h,])) )
+                        dp.cluster.sigma.inv %*% ((group.betas[group.cluster.assignments==h,])) )
         } else {
           m <- S %*%(dp.dist.sigma0.inv %*% group.dp.dist.mu0 + 
-                       dp.cluster.sigma.inv %*% (colSums(group.betas[group.clusterAssignments==h,])) )
+                       dp.cluster.sigma.inv %*% (colSums(group.betas[group.cluster.assignments==h,])) )
         }
         means.currentCluster = rmvnorm(1, m, S)
-        model.current$clusterMeans[[group.index]][h,] = means.currentCluster
-
+        model.current$cluster.mu[[group.index]][h,] = means.currentCluster
+        
         # All subjects within a cluster have same distribution of random effects
         # Step 5: draw intercept conditional on slope and dropout time
         #Update beta i given cluster mean and var and ui for each subject
@@ -385,39 +340,39 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         # inverse of the 2x2 covariance of the slope and the log dropout time
         inv.slopeU = solve(group.dp.cluster.sigma[-1,-1])
         covar = matrix(group.dp.cluster.sigma[1, c(2,3)],1)
-        betas.currentCluster = group.betas[group.clusterAssignments==h,]
+        betas.currentCluster = group.betas[group.cluster.assignments==h,]
         subjectMeans.currentCluster = matrix(rep(means.currentCluster, 
                                                  nrow(betas.currentCluster)),
                                              ncol=3,byrow=TRUE)
         ## conditional prior mean/var
         prior.mean = as.numeric((means.currentCluster[1] + covar %*% inv.slopeU %*% 
-                t(betas.currentCluster[,c(2,3)] - subjectMeans.currentCluster[,c(2,3)])))
+                                   t(betas.currentCluster[,c(2,3)] - subjectMeans.currentCluster[,c(2,3)])))
         prior.var = as.numeric((group.dp.cluster.sigma[1,1] - covar %*% inv.slopeU %*% t(covar)))
         ## calculate the posterior mean and variance for the random intercept
-        posterior.var = 1 / ((1 / prior.var) + (group.nobs[group.clusterAssignments==h] / group.sigma.error))
+        posterior.var = 1 / ((1 / prior.var) + (group.nobs[group.cluster.assignments==h] / group.sigma.error))
         # get the data for subjects in this cluster
-        tempid = rep(group.clusterAssignments, group.nobs)
+        tempid = rep(group.cluster.assignments, group.nobs)
         data.currentCluster = group.data[tempid==h,]
         # calculate the posterior mean
         if (is.null(covariates.var)) {
           randomInts = data.currentCluster[,outcomes.var] - 
             data.currentCluster[, times.observation.var] * 
-            rep(group.betas[group.clusterAssignments==h, 2],
-                group.nobs[group.clusterAssignments==h])
+            rep(group.betas[group.cluster.assignments==h, 2],
+                group.nobs[group.cluster.assignments==h])
         } else {
           randomInts = data.currentCluster[,outcomes.var] - 
             data.currentCluster[, times.observation.var] * 
-            rep(group.betas[group.clusterAssignments==h, 2],
-                group.nobs[group.clusterAssignments==h]) - 
+            rep(group.betas[group.cluster.assignments==h, 2],
+                group.nobs[group.cluster.assignments==h]) - 
             data.currentCluster[, covariates.var] %*% group.beta.covariates
         }
         posterior.mean = (posterior.var * 
                             ((prior.mean/prior.var) + 
                                ((1/group.sigma.error) * 
-                               tapply(randomInts, data.currentCluster[, ids.var],sum)))) 
+                                  tapply(randomInts, data.currentCluster[, ids.var],sum)))) 
         # draw the random intercepts
-        group.betas[group.clusterAssignments == h, 1] = 
-          rnorm(perClusterN[h], posterior.mean, sqrt(posterior.var))
+        group.betas[group.cluster.assignments == h, 1] = 
+          rnorm(group.cluster.N[h], posterior.mean, sqrt(posterior.var))
         
         ######  B1|B0 and U (Step 5 continued, draw random slope given intercept and u)
         inv.intU = solve(group.dp.cluster.sigma[-2,-2])
@@ -435,31 +390,31 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         if (is.null(covariates.var)) {
           randomSlopes = (data.currentCluster[, times.observation.var]) * 
             (data.currentCluster[,outcomes.var] - 
-            rep(group.betas[group.clusterAssignments==h, 1],
-                group.nobs[group.clusterAssignments==h]))
+               rep(group.betas[group.cluster.assignments==h, 1],
+                   group.nobs[group.cluster.assignments==h]))
         } else {
           randomSlopes = (data.currentCluster[, times.observation.var]) * 
             (data.currentCluster[,outcomes.var] - 
-               rep(group.betas[group.clusterAssignments==h, 1],
-                   group.nobs[group.clusterAssignments==h]) - 
-            data.currentCluster[, covariates.var] %*% group.beta.covariates)
+               rep(group.betas[group.cluster.assignments==h, 1],
+                   group.nobs[group.cluster.assignments==h]) - 
+               data.currentCluster[, covariates.var] %*% group.beta.covariates)
         }
         posterior.mean = (posterior.var * 
                             ((prior.mean/prior.var) + 
                                ((1/group.sigma.error) * 
                                   tapply(randomSlopes, data.currentCluster[, ids.var],sum)))) 
         # draw the random intercepts
-        group.betas[group.clusterAssignments == h, 2] = 
-          rnorm(perClusterN[h], posterior.mean, sqrt(posterior.var))
-
+        group.betas[group.cluster.assignments == h, 2] = 
+          rnorm(group.cluster.N[h], posterior.mean, sqrt(posterior.var))
+        
         # calculating the subject specific deviations from the cluster means
         # used to simplify calculation of the covariance
         #calculate betas minus their means
-        group.betas.deviations[group.clusterAssignments == h,] = (
-          group.betas[group.clusterAssignments == h,] - 
-            (matrix(rep(means.currentCluster, perClusterN[h]), ncol=3, byrow=TRUE))
+        group.betas.deviations[group.cluster.assignments == h,] = (
+          group.betas[group.cluster.assignments == h,] - 
+            (matrix(rep(means.currentCluster, group.cluster.N[h]), ncol=3, byrow=TRUE))
         )
-
+        
       } # END CLUSTER-SPECIFIC UPDATE LOOP
       
       # update the model iteration
@@ -475,19 +430,18 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         prior.options$dp.cluster.sigma.nu0 + group.N, # <- check typo
         prior.options$dp.cluster.sigma.T0 + crossprod(group.betas.deviations)
       )
-
+      
       ### Update the hyprparameters of the baseline distribution of 
       ### the Dirichlet process (Step 6)
       # update the mean
-      sigma0.inv = solve(dp.dist.sigma0)
       Sb.inv = solve(prior.options$dp.dist.mu0.Sb)
-      var = solve(Sb.inv + numNonEmptyClusters * sigma0.inv)
+      var = solve(Sb.inv + numNonEmptyClusters * dp.dist.sigma0.inv)
       if (numNonEmptyClusters == 1) {
         m <- var %*% (Sb.inv %*% prior.options$dp.dist.mu0.mb + 
-                        sigma0.inv %*% ((model.current$clusterMeans[perClusterN > 0,])) )
+                        dp.dist.sigma0.inv %*% ((model.current$cluster.mu[[group.index]][group.cluster.N > 0,])) )
       } else {
-        m <- var %*% (prior.options$dp.dist.mu0.Sb %*% mb0 + 
-                        sigma0.inv %*% (colSums(model.current$clusterMeans[[group.index]][perClusterN > 0,])) )
+        m <- var %*% (prior.options$dp.dist.mu0.Sb %*% prior.options$dp.dist.mu0.mb + 
+                        sigma0.inv %*% (colSums(model.current$cluster.mu[[group.index]][group.cluster.N > 0,])) )
       }
       model.current$dp.dist.mu0[[group.index]] = rmvnorm(1,m,var)
       
@@ -495,32 +449,67 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       model.current$dp.dist.sigma0[[group.index]] = riwish(
         prior.options$dp.dist.sigma0.nub + numNonEmptyClusters,
         prior.options$dp.dist.sigma0.Tb + 
-          crossprod(model.current$clusterMeans[[group.index]][perClusterN > 0,] - 
-                      matrix(rep(model.current$dp.dist.mu0[[group.index]],ncluster), 
+          crossprod(model.current$cluster.mu[[group.index]][group.cluster.N > 0,] - 
+                      matrix(rep(model.current$dp.dist.mu0[[group.index]],n.clusters), 
                              numNonEmptyClusters, byrow=T))
       )
       
       
+      ### calculate per-group summary statistics
       #Estimate Density of Slope - for plotting density of the random slope (output only)  
-      tmp5<-tmp6<-NULL
-      for(h in 1:H){tmp5<-rbind(tmp5,pi[h]*dnorm(grid, mu[h,2], sqrt(Sigma.b[2,2])))
-      tmp6<-rbind(tmp6,pi[h]*dnorm(grid, mu[h,1], sqrt(Sigma.b[1,1])))
+      domain <-seq(-4,4,0.01)
+      sim.slope = vector()
+      sim.int = vector()
+      for (h in 1:n.clusters) {
+        sim.int <-rbind(sim.slope,
+                        (clusterProbabilities[h] * 
+                           dnorm(domain, model.current$cluster.mu[[group.index]][h,1], 
+                                 sqrt(model.current$dp.dist.sigma0[[group.index]][1,1]))))
+        sim.slope <-rbind(sim.slope,
+                          (clusterProbabilities[h] * 
+                             dnorm(domain, model.current$cluster.mu[[group.index]][h,2], 
+                                   sqrt(model.current$dp.dist.sigma0[[group.index]][2,2]))))
       }
-      dens1[i,]<-colSums(tmp5)
-      dens0[i,]<-colSums(tmp6)
+      model.current$density.intercept[[group.index]] <- colSums(sim.int)
+      model.current$density.slope[[group.index]] <- colSums(sim.slope)
       
       # Equation 19
       #Estimate slope at each dropout time
-      for (h in 1:H) tmp4[,h]<-pi[h]*dnorm(log(seq(1/15,16/15,1/15)),mu[h,3],sqrt(covar[9]))
-      p.u<-tmp4/apply(tmp4,1,sum)
-      for(uu in 1:16){uspecific.zz[i,uu]<-sum(p.u[uu,]*(mu[,2]+covar[6]*(log(uu/15)-mu[,3])/covar[9]))}
+      if (model.options$dropout.estimationTimes) {
+        tmp = matrix(0,length(model.options$dropout.estimationTimes), n.clusters)
+        for (h in 1:n.clusters) {
+          tmp[,h] = (
+            clusterProbabilities[h] * 
+              dnorm(log(model.options$dropout.estimationTimes),
+                        model.current$cluster.mu[[group.index]][h,3],
+                        sqrt(model.current$dp.cluster.sigma[[group.index]][3,3]))
+                                          
+          ) 
+        }
+        
+        p = tmp / apply(tmp,1,sum)
+        
+        for(h in 1:n.clusters) {
+          uspecific.zz[i,h]<-sum(p[h,]*(mu[,2]+covar[6]*(log(uu/15)-mu[,3])/covar[9]))
+        }
+      } else {
+        model.current$slope.dropoutTimes = NULL
+      }
       
-      #Estimate E(B1), E(B0) - section 2.4 expectation of random effects (int, slope)
-      expected.zz1[i]<-sum(pi*mu[,2])
-      expected.zz0[i]<-sum(pi*mu[,1])
+      
+      
+      # estimated slopes at specified dropout times
+      # slope.dropoutTimes = slope.dropoutTimes,
+      
+      # Estimate E(B1), E(B0) - section 2.4 expectation of random effects (int, slope)
+      model.current$expected.intercept[[group.index]] = 
+        sum(clusterProbabilities * model.current$cluster.mu[[group.index]][,1])
+      model.current$expected.slope[[group.index]] = 
+        sum(clusterProbabilities * model.current$cluster.mu[[group.index]][,2])
+      
       
     } # END GROUP-SPECIFIC UPDATE LOOP
-     
+    
     if (dist = "gaussian") {
       ## TODO: remove group specific variables, use betas (random effects)
       # Step 9 Update sigma.error with inverse gamma
@@ -548,12 +537,12 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     } else {
       # metropolis hastings
     }
-
     
-
+    
+    
   } # END ITERATION LOOP
 }
-    
+
 
 
 
@@ -693,7 +682,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       return(logit(rep(sum(y)/N, N)))
     })
   }
-
+  
   
   # initialize the first model iteration
   # TODO: mcmc options specify starting values
