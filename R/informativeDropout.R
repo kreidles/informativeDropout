@@ -81,11 +81,8 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   }
   
   if (dist == 'gaussian') {
-    if (is.null(prior.options$sigma.error.tau1)) {
-      stop("Prior options error :: invalid tau1 (hyperparameter) for the error variance")
-    }
-    if (is.null(prior.options$sigma.error.tau2)) {
-      stop("Prior options error :: invalid tau2 (hyperparameter) for the error variance")
+    if (is.null(prior.options$sigma.error.tau)) {
+      stop("Prior options error :: invalid tau (hyperparameter) for the error variance")
     }
   }
   
@@ -200,9 +197,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   
   # for Gaussian outcomes, the residual error
   if (dist == "gaussian") {
-    sigma.error = lapply(groupList, function(group) {
-      return(prior.options$sigma.error)
-    })
+    sigma.error = prior.options$sigma.error
   }
   
   
@@ -226,7 +221,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     sigma.error = sigma.error
   )
   
-  for (i in 2:mcmc.options$iterations) {
+  for (i in 2:model.options$iterations) {
     
     print(paste("ITER = ", i, sep=""))
     
@@ -234,7 +229,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     # make a copy which will be modified as we move through the iteration
     model.current = model.previous
     
-    for (group.index in groupList) {
+    for (group.index in 1:length(groupList)) {
       
       group = groupList[group.index]
       # get the subset of data for this group
@@ -252,7 +247,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       group.dp.dist.sigma0 = model.current$dp.dist.sigma0[[group.index]]
       group.dp.cluster.sigma = model.current$dp.cluster.sigma[[group.index]]
       if (dist == "gaussian") {
-        group.sigma.error = model.current$sigma.error[[group.index]]
+        group.sigma.error = model.current$sigma.error
       }
       
       # calculate the overall probability of belonging to a cluster (length = #clusters)
@@ -303,10 +298,10 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       
       # Alpha is concentration parameter of the dirichlet process (step 7)
       # sample latent beta distributed variable (Escobar and West 1995)
-      eta <- rbeta(1, prior.options$dp.concentration + 1, group.N)
+      eta <- rbeta(1, prior.options$dp.concentration + 1, group.n)
       # sample the concentration parameter from a mixture of Gamma distributions
       pi.eta <- ((prior.options$dp.concentration.alpha + numNonEmptyClusters - 1) /
-                   (group.N * (prior.options$dp.concentration.beta - log(eta)) +
+                   (group.n * (prior.options$dp.concentration.beta - log(eta)) +
                       prior.options$dp.concentration.alpha + numNonEmptyClusters - 1))
       # now draw the new concentration parameter for the Dirichlet process
       model.current$concentration[[group.index]] <- 
@@ -427,7 +422,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       # Common covariance for each cluster (Step 4)
       # Update Cluster Covariance
       model.current$dp.cluster.sigma[[group.index]] = riwish(
-        prior.options$dp.cluster.sigma.nu0 + group.N, # <- check typo
+        prior.options$dp.cluster.sigma.nu0 + group.n, # <- check typo
         prior.options$dp.cluster.sigma.T0 + crossprod(group.betas.deviations)
       )
       
@@ -441,7 +436,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
                         dp.dist.sigma0.inv %*% ((model.current$cluster.mu[[group.index]][group.cluster.N > 0,])) )
       } else {
         m <- var %*% (prior.options$dp.dist.mu0.Sb %*% prior.options$dp.dist.mu0.mb + 
-                        sigma0.inv %*% (colSums(model.current$cluster.mu[[group.index]][group.cluster.N > 0,])) )
+                        dp.dist.sigma0.inv %*% (colSums(model.current$cluster.mu[[group.index]][group.cluster.N > 0,])) )
       }
       model.current$dp.dist.mu0[[group.index]] = rmvnorm(1,m,var)
       
@@ -475,31 +470,32 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       
       # Equation 19
       #Estimate slope at each dropout time
-      if (model.options$dropout.estimationTimes) {
+      if (!is.null(model.options$dropout.estimationTimes)) {
         tmp = matrix(0,length(model.options$dropout.estimationTimes), n.clusters)
         for (h in 1:n.clusters) {
           tmp[,h] = (
             clusterProbabilities[h] * 
               dnorm(log(model.options$dropout.estimationTimes),
-                        model.current$cluster.mu[[group.index]][h,3],
-                        sqrt(model.current$dp.cluster.sigma[[group.index]][3,3]))
-                                          
+                    model.current$cluster.mu[[group.index]][h,3],
+                    sqrt(model.current$dp.cluster.sigma[[group.index]][3,3]))
           ) 
         }
         
         p = tmp / apply(tmp,1,sum)
-        
-        for(h in 1:n.clusters) {
-          uspecific.zz[i,h]<-sum(p[h,]*(mu[,2]+covar[6]*(log(uu/15)-mu[,3])/covar[9]))
+        for(u in 1:length(model.options$dropout.estimationTimes)) {
+          covar = model.current$dp.cluster.sigma[[group.index]]
+          dropoutTime = model.options$dropout.estimationTimes[u]
+          model.current$slope.dropoutTimes[[group.index]][u] = (
+            sum(p[u,] * 
+                  (model.current$cluster.mu[[group.index]][,2] + 
+                     covar[2,3] * 
+                     (log(u) - model.current$cluster.mu[[group.index]][,2]) /
+                     covar[3,3]))
+          )
         }
       } else {
         model.current$slope.dropoutTimes = NULL
       }
-      
-      
-      
-      # estimated slopes at specified dropout times
-      # slope.dropoutTimes = slope.dropoutTimes,
       
       # Estimate E(B1), E(B0) - section 2.4 expectation of random effects (int, slope)
       model.current$expected.intercept[[group.index]] = 
@@ -510,38 +506,47 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       
     } # END GROUP-SPECIFIC UPDATE LOOP
     
-    if (dist = "gaussian") {
+    # combine the random effects for each group into complete arrays
+    intercepts = vector()
+    slopes = vector()
+    for (group.index in 1:length(groupList)) {
+      intercepts = c(intercepts, rep(model.current$betas[[group.index]][,1], 
+                                     nobj.perGroup[[group.index]]))
+      slopes = c(slopes, rep(model.current$betas[[group.index]][,2], 
+                             nobj.perGroup[[group.index]]))
+    }
+    
+    if (dist == "gaussian") {
       ## TODO: remove group specific variables, use betas (random effects)
       # Step 9 Update sigma.error with inverse gamma
-      residual = (group.data[, outcomes.var] - 
-                    (Z[,1] * alpha[,1] + Z[,2] * alpha[,2]) -  
-                    ifelse(is.null(covariates), 
-                           as.vector(as.matrix(group.data[,covariates.var]) %*% 
-                                       model.current$betas.covariates[[group.index]]), 
-                           0))
-      g <- prior.options$sigma.error.tau1 + crossprod(residual)/2
-      tau <- rgamma(1, prior.options$sigma.error.tau1 + group.N / 2, g)
-      model.current$sigma.error[[group.index]] = 1 / tau
+      residual = data[, outcomes.var] - (intercepts + data[, times.observation.var] * slopes)
+      if (!is.null(covariates.var)) {
+        residual = residual - as.vector(as.matrix(data[,covariates.var]) %*% 
+                                          model.current$betas.covariates)
+      }
+      g <- prior.options$sigma.error.tau + crossprod(residual)/2
+      tau <- rgamma(1, prior.options$sigma.error.tau + n.subjects / 2, g)
+      model.current$sigma.error = 1 / tau
     } 
     
     # update fixed effects associated with covariates
-    if (dist == "gaussian") {
-      sigma.error.inv = 1/model.current$sigma.error
-      prior.sigma.inv = solve(prior.options$betas.covariates.sigma)
-      var = solve(prior.sigma.inv + crossprod(data[,covariates.var]) * sigma.error.inv)
-      residuals = data[, outcomes.var] - model.current$betas[,1] - 
-        model.current$betas[,2] * data[, times.observation.var]
-      m <- var %*% (crossprod(data[, covariates.var], residuals) * sigma.error.inv)
-      model.current$betas.covariates = rmvnorm(1,m,var)
-      
-    } else {
-      # metropolis hastings
+    if (!is.null(covariates.var)) {
+      if (dist == "gaussian") {
+        sigma.error.inv = 1/model.current$sigma.error
+        prior.sigma.inv = solve(prior.options$betas.covariates.sigma)
+        
+        residuals = data[, outcomes.var] - intercepts - slopes * data[, times.observation.var]
+        var = solve(prior.sigma.inv + crossprod(data[,covariates.var]) * sigma.error.inv)
+        
+        m <- var %*% (crossprod(data[, covariates.var], residuals) * sigma.error.inv)
+        model.current$betas.covariates = rmvnorm(1,m,var)
+        
+      } else {
+        # metropolis hastings
+      }
     }
-    
-    
-    
   } # END ITERATION LOOP
-}
+} # END FUNCTION 
 
 
 

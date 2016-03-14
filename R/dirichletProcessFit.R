@@ -148,7 +148,8 @@ dirichlet.prior.options <- function(dp.concentration=NULL,
                                     betas.covariates = NULL,
                                     betas.covariates.mu = NULL,
                                     betas.covariates.sigma = NULL,
-                                    sigma.error = NULL) {
+                                    sigma.error = NULL,
+                                    sigma.error.tau = NULL) {
   
   
   # validate the prior options
@@ -243,7 +244,9 @@ dirichlet.prior.options <- function(dp.concentration=NULL,
     betas.covariates.sigma = betas.covariates.sigma,
     
     # residual error (Gaussian outcomes only)
-    sigma.error = sigma.error
+    sigma.error = sigma.error,
+    sigma.error.tau = sigma.error.tau
+    
   )
   
   class(opts) <- append(class(opts), "dirichlet.prior.options")
@@ -320,7 +323,7 @@ test.sim <- function() {
   method="bayes.dirichlet"
   dist = "gaussian"
 
-  model.options=dirichlet.model.options(iterations=1000, n.clusters=15,
+  model.options=dirichlet.model.options(iterations=3, n.clusters=15, burnin=0,
                                        dropout.estimationTimes = seq(1/15,1,1/15))
   
   prior.options = dirichlet.prior.options(dp.concentration=1,
@@ -338,10 +341,16 @@ test.sim <- function() {
                                           betas.covariates = NULL,
                                           betas.covariates.mu = NULL,
                                           betas.covariates.sigma = NULL,
-                                          sigma.error = 1)
+                                          sigma.error = 1,
+                                          sigma.error.tau = 1)
     
   
   set.seed(1066)
+  result = informativeDropout.bayes.dirichlet(data, ids.var, 
+                                              outcomes.var, groups.var,
+                                              covariates.var, 
+                                              times.dropout.var, times.observation.var,
+                                              dist, model.options, prior.options)
   result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
                               times.dropout.var, times.observation.var, 
                               method, dist,
