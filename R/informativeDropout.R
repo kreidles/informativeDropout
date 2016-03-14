@@ -240,7 +240,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       group.weights.conditional = model.current$weights.conditional[[group.index]]
       group.betas = model.current$betas[[group.index]]
       group.betas.deviations = model.current$betas.deviations[[group.index]]
-      group.beta.covariates = model.current$beta.covariates[[group.index]]
+      group.beta.covariates = model.current$beta.covariates
       group.cluster.mu = model.current$cluster.mu[[group.index]]
       group.dp.cluster.sigma = model.current$dp.cluster.sigma[[group.index]]
       group.dp.dist.mu0 = model.current$dp.dist.mu0[[group.index]]
