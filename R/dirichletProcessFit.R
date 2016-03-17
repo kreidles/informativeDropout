@@ -40,10 +40,10 @@ require(matrixcalc)
 dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
                                 cluster.assignments = NULL,
                                 betas = NULL, 
+                                betas.deviations = NULL,
                                 betas.covariates = NULL, 
                                 betas.covariates.mu = NULL,
                                 betas.covariates.sigma = NULL,
-                                betas.deviations = NULL,
                                 dp.dist.mu0 = NULL, dp.dist.sigma0 = NULL,
                                 dp.cluster.sigma = NULL,
                                 dp.concentration=NULL, 
@@ -323,7 +323,7 @@ test.sim <- function() {
   method="bayes.dirichlet"
   dist = "gaussian"
 
-  model.options=dirichlet.model.options(iterations=3, n.clusters=15, burnin=0,
+  model.options=dirichlet.model.options(iterations=50, n.clusters=15, burnin=0,
                                        dropout.estimationTimes = seq(1/15,1,1/15))
   
   prior.options = dirichlet.prior.options(dp.concentration=1,
