@@ -307,7 +307,7 @@ dirichlet.model.options = function(iterations=10000, burnin=500, thin=NULL,
 
 
 test.sim <- function() {
-  data <- read.table("../Rnsv/code/sim_sml_1.dat")
+  data <- read.table("../rnsv/code/sim_sml_1.dat")
   #data$day = data$years * 365
   
   names(data) <- c("patid", "alpha", "drptm", "b1", "b2",

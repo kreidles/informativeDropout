@@ -215,7 +215,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     dp.cluster.sigma = dp.cluster.sigma,
     dp.concentration=concentration, 
     cluster.N = n.perCluster,
-    cluster.mu=cluster.means, 
+    cluster.mu=cluster.mu, 
     expected.intercept=NULL, expected.slope=NULL,
     slope.dropoutTimes = start.slope.dropoutTimes,
     sigma.error = sigma.error
@@ -331,13 +331,13 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         # inverse of the 2x2 covariance of the slope and the log dropout time
         inv.slopeU = solve(group.dp.cluster.sigma[-1,-1])
         covar = matrix(group.dp.cluster.sigma[1, c(2,3)],1)
-        betas.currentCluster = group.betas[group.cluster.assignments==h,]
-        subjectMeans.currentCluster = matrix(rep(means.currentCluster, 
-                                                 nrow(betas.currentCluster)),
+        betas.currentCluster = group.betas[group.cluster.assignments==h,,drop=FALSE]
+        betas.currentCluster.rows = ifelse(group.cluster.N[h] > 0, nrow(betas.currentCluster), 0)
+        subjectMeans.currentCluster = matrix(rep(means.currentCluster, betas.currentCluster.rows),
                                              ncol=3,byrow=TRUE)
         ## conditional prior mean/var
         prior.mean = as.numeric((means.currentCluster[1] + covar %*% inv.slopeU %*% 
-                                   t(betas.currentCluster[,c(2,3)] - subjectMeans.currentCluster[,c(2,3)])))
+                                   t(betas.currentCluster[,c(2,3),drop=FALSE] - subjectMeans.currentCluster[,c(2,3),drop=FALSE])))
         prior.var = as.numeric((group.dp.cluster.sigma[1,1] - covar %*% inv.slopeU %*% t(covar)))
         ## calculate the posterior mean and variance for the random intercept
         posterior.var = 1 / ((1 / prior.var) + (group.nobs[group.cluster.assignments==h] / model.current$sigma.error))
@@ -370,7 +370,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         covar = matrix(c(group.dp.cluster.sigma[1,2], group.dp.cluster.sigma[2,3]),1)
         # conditional prior mean/var
         prior.mean = as.numeric((means.currentCluster[2] + covar %*% inv.intU %*% 
-                                   t(betas.currentCluster[,c(1,3)] - subjectMeans.currentCluster[,c(1,3)])))
+                                   t(betas.currentCluster[,c(1,3),drop=FALSE] - subjectMeans.currentCluster[,c(1,3),drop=FALSE])))
         prior.var = as.numeric((group.dp.cluster.sigma[2,2] - covar %*% inv.intU %*% t(covar)))
         ## calculate the posterior mean and variance for the random intercept
         posterior.var = 1 / ((1 / prior.var) + 
@@ -411,12 +411,13 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       # update the model iteration
       model.current$betas[[group.index]] = group.betas
       model.current$betas.deviations[[group.index]] = group.betas.deviations
-      
+      print(group.betas.deviations)
       
       #### TODO: add flag to indicate if cluster covariance is updated per group
       ## or updated across groups
       # Common covariance for each cluster (Step 4)
       # Update Cluster Covariance
+      print(prior.options$dp.cluster.sigma.T0 + crossprod(group.betas.deviations))
       model.current$dp.cluster.sigma[[group.index]] = riwish(
         prior.options$dp.cluster.sigma.nu0 + group.n, # <- check typo
         prior.options$dp.cluster.sigma.T0 + crossprod(group.betas.deviations)
@@ -435,14 +436,14 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
                         dp.dist.sigma0.inv %*% (colSums(model.current$cluster.mu[[group.index]][group.cluster.N > 0,])) )
       }
       model.current$dp.dist.mu0[[group.index]] = as.vector(rmvnorm(1,m,var))
-      print(model.current$dp.dist.mu0)
+      
       # update the variance of the baseline distribution
       model.current$dp.dist.sigma0[[group.index]] = riwish(
         prior.options$dp.dist.sigma0.nub + numNonEmptyClusters,
         prior.options$dp.dist.sigma0.Tb + 
           crossprod(model.current$cluster.mu[[group.index]][group.cluster.N > 0,] - 
-                      matrix(rep(model.current$dp.dist.mu0[[group.index]],n.clusters), 
-                             numNonEmptyClusters, byrow=T))
+                      matrix(rep(model.current$dp.dist.mu0[[group.index]],numNonEmptyClusters), 
+                             nrow=numNonEmptyClusters, byrow=T))
       )
       
       
