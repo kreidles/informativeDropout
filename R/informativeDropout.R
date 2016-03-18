@@ -93,6 +93,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   # reorder by group, subject, and observation time
   data <- data[order(data[,groups.var], data[,ids.var], data[,times.observation.var]),]
   rownames(data) <- NULL
+  n.total = nrow(data)
   # get the list of treatment groups
   groupList <- unique(data[,groups.var])
   # number of subjects
@@ -162,7 +163,9 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   # and slope.  We append the log of the dropout time
   betas = lapply(groupList, function(group) {
     N = length(unique(data[data[,groups.var] == group, ids.var]))
-    logDropout = log(unique(data[data[,groups.var] == group, ids.var]))
+    logDropout = log(unique(data[data[,groups.var] == group,
+                                 c(ids.var,times.dropout.var)])[,times.dropout.var] + 
+                              model.options$dropout.offset)
     return(cbind(intercept=rep(0,N), slope=rep(0,N), logDropout))
   })
   # starting value for subject specific deviations from the cluster mean
@@ -285,7 +288,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
                        prior.options$dp.concentration + 
                          sum(group.cluster.N[(h+1):n.clusters])))
         } else {
-          return(rbeta(1, 1 + group.cluster.N[h], prior.options$dp.concentration))
+          return(1)
         }
       })
       
@@ -411,13 +414,11 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       # update the model iteration
       model.current$betas[[group.index]] = group.betas
       model.current$betas.deviations[[group.index]] = group.betas.deviations
-      print(group.betas.deviations)
-      
+
       #### TODO: add flag to indicate if cluster covariance is updated per group
       ## or updated across groups
       # Common covariance for each cluster (Step 4)
       # Update Cluster Covariance
-      print(prior.options$dp.cluster.sigma.T0 + crossprod(group.betas.deviations))
       model.current$dp.cluster.sigma[[group.index]] = riwish(
         prior.options$dp.cluster.sigma.nu0 + group.n, # <- check typo
         prior.options$dp.cluster.sigma.T0 + crossprod(group.betas.deviations)
@@ -522,7 +523,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
                                           model.current$betas.covariates)
       }
       g <- prior.options$sigma.error.tau + crossprod(residual)/2
-      tau <- rgamma(1, prior.options$sigma.error.tau + n.subjects / 2, g)
+      tau <- rgamma(1, prior.options$sigma.error.tau + n.total / 2, g)
       model.current$sigma.error = 1 / tau
     } 
     
