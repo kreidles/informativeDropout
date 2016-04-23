@@ -259,7 +259,7 @@ addKnot.binary <- function(knots.previous, outcomes,
   prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
   prob.star[prob.star < model.options$prob.max] <-  model.options$prob.max
   loglikelihood.star <- sum(log((1 - prob.star[outcomes==0]))) + sum(log(prob.star[outcomes==1]))    
-
+  
   #Calculate Acceptance Probability  
   rho <- (log(lambda.numKnots) - 
             log(length(knots.previous)) + 
@@ -483,10 +483,10 @@ removeKnot.binary <- function(dist, knots.previous, outcomes, times.dropout,
 #' @examples
 #' 
 removeKnot.gaussian <- function(dist, knots.previous, knots.options, 
-                       outcomes, times.dropout, times.observation, covariates,
-                       X.previous, Theta.previous, 
-                       Z, alpha, betaCovariates, sigma.residual,  
-                       sigma.error, sigma.beta, lambda.numKnots) {
+                                outcomes, times.dropout, times.observation, covariates,
+                                X.previous, Theta.previous, 
+                                Z, alpha, betaCovariates, sigma.residual,  
+                                sigma.error, sigma.beta, lambda.numKnots) {
   
   # randomly remove an existing knot
   index = sample(1:length(knots.previous), 1)
@@ -571,9 +571,10 @@ removeKnot.gaussian <- function(dist, knots.previous, knots.options,
 #' add(1, 1)
 #' add(10, 1)
 moveKnot.binary <- function(dist, knots.previous, knots.stepSize, knots.candidatePositions,
-                              outcomes, times.dropout, times.observation, covariates,
-                              X.previous, Theta.previous, 
-                              Z, alpha, betaCovariates, eta.null) {
+                            outcomes, times.dropout, times.observation, covariates,
+                            X.previous, Theta.previous, 
+                            Z, alpha, betaCovariates, eta.null) {
+  
   #Pick a knot to move 
   knotToMove <- sample(knots.previous, 1) 
   # get index of knot to be moved
@@ -655,9 +656,9 @@ moveKnot.binary <- function(dist, knots.previous, knots.stepSize, knots.candidat
 #' add(1, 1)
 #' add(10, 1)
 moveKnot.gaussian <- function(dist, knots.previous, knots.stepSize, knots.candidatePositions,
-                     outcomes, times.dropout, times.observation, covariates,
-                     X.previous, Theta.previous, 
-                     Z, alpha, betaCovariates, sigma.error) {
+                              outcomes, times.dropout, times.observation, covariates,
+                              X.previous, Theta.previous, 
+                              Z, alpha, betaCovariates, sigma.error) {
   #Pick a knot to move 
   knotToMove <- sample(knots.previous, 1) 
   # get index of knot to be moved
@@ -732,11 +733,83 @@ moveKnot.gaussian <- function(dist, knots.previous, knots.stepSize, knots.candid
 #' @examples
 #' add(1, 1)
 #' add(10, 1)
-updateFixedEffects <- function(dist, knots.previous, knots.options, 
-                               outcomes, times.dropout, times.observation, covariates,
-                               X.previous, Theta.previous, 
-                               Z, alpha, betaCovariates,  
-                               sigma.error, sigma.beta, lambda.numKnots) {
+updateFixedEffects.binary <- function(knots.previous, outcomes, times.dropout, times.observation, covariates,
+                                      X.previous, Theta.previous, 
+                                      Z, alpha, betaCovariates, 
+                                      sigma.beta, lambda.numKnots, eta.null, model.options) {
+  
+  # build components of eta
+  y <- as.matrix(outcomes)
+  if (!is.null(covariates)) {
+    cBeta = as.vector(as.matrix(covariates) %*% betaCovariates)
+  }
+  zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
+  
+  XTheta.previous = X.previous %*% Theta.previous 
+  # calculate the previous eta and associated probability
+  eta.previous = as.vector(XTheta.previous + ifelse(!is.null(covariates), cBeta, 0) + zAlpha)
+  prob.previous = inv.logit(eta.previous)
+  # adjust probabilities within tolerance levels
+  prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
+  prob.previous[prob.previous < model.options$prob.max] <-  model.options$prob.max
+  loglikelihood.previous <- sum(log((1 - prob.previous[y==0]))) + sum(log(prob.previous[y==1]))    
+  
+  # create the covariance matrix for the intercept and theta coefficients for the splines - R0
+  covarIntTheta <- diag(rep(sigma.beta, (length(knots.previous)+1))) 
+  covarIntThetaInverse <- diag(rep(1/sigma.beta, (length(knots.previous)+1))) 
+  # build y-tilde
+  yt = XTheta.previous + (y - prob.previous) * (1 / (prob.previous * (1 - prob.previous)))
+  # build the weight matrix
+  weight <- Diagonal(x = prob.previous * (1-prob.previous))
+  # build the covariance of the beta coefficients and make sure it is positive definite
+  covar <- as.matrix(nearPD(solve(covarIntThetaInverse + crossprod(X.previous, weight %*% X.previous)))$mat)
+  # build the mean
+  mu <- covar  %*% (crossprod(X.previous, weight %*% yt))
+  # draw the proposed coefficients for the fixed effects
+  Theta.star <- rmvnorm(1, mu, covar)
+  
+  # get proposal probabilities
+  XTheta.star = X.previous %*% t(Theta.star)
+  eta.star <- XTheta.star + ifelse(!is.null(covariates), cBeta, 0) + zAlpha
+  prob.star = inv.logit(eta.previous)
+  # adjust probabilities within tolerance levels
+  prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
+  prob.star[prob.star < model.options$prob.max] <-  model.options$prob.max
+  loglikelihood.star <- sum(log((1 - prob.star[y == 0]))) + sum(log(prob.star[y == 1]))    
+  
+  y.star <- XTheta.star + (y - prob.star) * (1 / (prob.star * (1 - prob.star)))
+  weight.star <- Diagonal(x=prob.star * (1 - prob.star))
+  covar.star <- as.matrix(nearPD(solve(covarIntThetaInverse + crossprod(X.previous, weight.star %*% X.previous)))$mat)
+  mu.star <- covar.star %*% (crossprod(Xt,weightstar%*%ystar))
+  
+  # Metropolis hastings step
+  rho <- (loglikelihood.star - loglikelihood.previous + 
+            log(dmvnorm(as.vector(ct[[i]]), as.vector(mntstar), covtstar)) - 
+            log(dmvnorm(pbeta, as.vector(mnt),covt)) +
+            (crossprod(as.vector(ct[[i]])) - tcrossprod(pbeta))/ (2 * sigma.beta))
+  if (rho > log(runif(1))) {
+    return (list(Theta=Theta.star, accepted=TRUE))
+  } else {
+    return (list(Theta=Theta.previous, accepted=FALSE))
+  }
+
+}
+
+
+#' Add a new knot and use a Metropolis-Hastings step
+#' to determine if we keep the changes to the model
+#' 
+#' @param x A number.
+#' @param y A number.
+#' @return The sum of \code{x} and \code{y}.
+#' @examples
+#' add(1, 1)
+#' add(10, 1)
+updateFixedEffects.gaussian <- function(dist, knots.previous, knots.options, 
+                                        outcomes, times.dropout, times.observation, covariates,
+                                        X.previous, Theta.previous, 
+                                        Z, alpha, betaCovariates,  
+                                        sigma.error, sigma.beta, lambda.numKnots) {
   
   # create the covariance matrix for the intercept and theta coefficients for the splines - R0
   covarIntTheta <- diag(rep(sigma.beta, (length(knots.previous)+1))) 
@@ -789,7 +862,66 @@ updateFixedEffects <- function(dist, knots.previous, knots.options,
 #' Update the regression coefficients related to common
 #' covariates and group effects
 #'
-updateFixedEffectsCovariates <- function(dist, outcomes, covariates, 
+updateFixedEffectsCovariates.binary <- function(outcomes, covariates, 
+                                                  X, Theta, Z, alpha, betaCovariates.previous,  
+                                                  sigma.error, sigma.beta) {
+  
+  # build X * beta for each group and combine into a single vector
+  cBeta = vector()
+  for(i in 1:length(X)) {
+    cBeta.group = X[[i]] %*% Theta[[i]]
+    cBeta <- c(cBeta, cBeta.group) 
+  }
+  
+  # calculate the residuals
+  residuals <- outcomes - cBeta - Z$intercept * alpha$intercept - Z$slope * alpha$slope
+  residuals = residuals[,outcomes.var]
+  # get the proposed mean/variance of the fixed effects associated with covariates
+  covariates.matrix = as.matrix(covariates)
+  covarIntTheta <- diag(rep(sigma.beta, ncol(covariates))) 
+  covarIntThetaInverse <- diag(rep(1/sigma.beta, ncol(covariates))) 
+  proposedCovariance <- ginv(covarIntThetaInverse + 
+                               (1/sigma.error) * t(covariates.matrix) %*% covariates.matrix)
+  proposedMean <- proposedCovariance %*% 
+    ((1/sigma.error) * t(covariates.matrix) %*% as.matrix(residuals))
+  
+  # Scale Cov to adjust acceptance rate
+  proposedCovariance <- proposedCovariance * 
+    ifelse(!is.null(mcmc.options$fixedEffectAcceptRateAdjust), 
+           mcmc.options$fixedEffectAcceptRateAdjust, 1)
+  
+  # ensure the covariance is positive definite
+  proposedCovariance <- as.matrix(nearPD(proposedCovariance)$mat) 
+  
+  # draw a proposed set of coefficients for the covariates
+  betaCovariates.star <- rmvnorm(1, proposedMean, proposedCovariance)
+  
+  # calculate the residuals
+  resid.star <- residuals - covariates.matrix %*% t(betaCovariates.star)
+  resid.previous <- residuals - covariates.matrix %*% (as.matrix(betaCovariates.previous))
+  
+  # calculate the acceptance probability
+  rho<-sum(log(dnorm(as.vector(resid.star), 0, sqrt(sigma.error)))) + 
+    log(dmvnorm(betaCovariates.star, rep(0, ncol(covariates)), covarIntTheta)) + 
+    log(dmvnorm(betaCovariates.previous, proposedMean, proposedCovariance)) - 
+    sum(log(dnorm(resid.star, 0, sqrt(sigma.error)))) - 
+    log(dmvnorm(betaCovariates.previous, rep(0, ncol(covariates)), covarIntTheta)) - 
+    log(dmvnorm(betaCovariates.star, proposedMean, proposedCovariance))
+  
+  if (rho > log(runif(1))) {
+    return (list(betaCovariates=as.vector(betaCovariates.star), accepted=TRUE))
+  } else {
+    return (list(betaCovariates=betaCovariates.previous, accepted=FALSE))
+  }
+}
+
+
+
+#'
+#' Update the regression coefficients related to common
+#' covariates and group effects
+#'
+updateFixedEffectsCovariates.gaussian <- function(outcomes, covariates, 
                                          X, Theta, Z, alpha, betaCovariates.previous,  
                                          sigma.error, sigma.beta) {
   
