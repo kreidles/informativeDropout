@@ -96,7 +96,7 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
     # densities of the random effects
     density.intercept = density.intercept,
     density.slope = density.slope
-
+    
   )
   
   class(mi) <- append(class(mi), "dirichlet.iteration")
@@ -291,11 +291,6 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=NULL,
 }
 
 
-
-
-
-
-
 #'
 #' infortmativeDropout.bayes.dirichlet
 #'
@@ -322,7 +317,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   if (!is(model.options,"dirichlet.model.options")) {
     stop("Model options error :: options must be of type dirichlet.model.options")
   }
-
+  
   # prior for covariate effects
   if (!is.null(covariates.var)) {
     if (is.na(model.options$betas.covariates.mu) || 
@@ -632,25 +627,36 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         } else {
           # binary distribution
           # Current Observation-Level Log-Likelihood
-          eta<-rep(betas[c==h,1], nobs[c==h])+t[tempid==h]*rep(betas[c==h,2],nobs[c==h])
-          Lt<-Lstar<-rep(0, length(tempid[tempid==h]))
-          Lt[y[tempid==h]==0]<-log(1-inv.logit(eta[y[tempid==h]==0]))  
-          Lt[y[tempid==h]==1]<-log(inv.logit(eta[y[tempid==h]==1]))
-          # Draw Candidate from Symmetric Rand Walk Proposal 
-          bs<-betas[c==h,1]+rnorm(ns[h])      # or b+rmvnorm(n,sigma=Sigma)
-          etastar<-rep(bs,nobs[c==h])+t[tempid==h]*rep(betas[c==h,2],nobs[c==h])
-          pstar<-inv.logit(etastar)
-          Lstar[y[tempid==h]==0]<-log(1-pstar[y[tempid==h]==0])
-          Lstar[y[tempid==h]==1]<-log(pstar[y[tempid==h]==1])
-          # Subject-Level Log-Likelihood
-          l<-tapply(Lt,patid[tempid==h],sum)
-          ls<-tapply(Lstar, patid[tempid==h], sum)
+          eta <- (rep(group.betas[group.cluster.assignments == h, 1], group.nobs[group.cluster.assignments == h]) + 
+                    data.currentCluster[, times.observation.var] * 
+                    rep(group.betas[group.cluster.assignments == h, 2], group.nobs[group.cluster.assignments == h]))
+          loglikelihood.previous <- rep(0, nrow(data.currentCluster))
+          loglikelihood.previous[data.currentCluster[, outcomes.var] == 0] <- 
+            log(1 - inv.logit(eta[data.currentCluster[, outcomes.var] == 0]))  
+          loglikelihood.previous[data.currentCluster[, outcomes.var] == 1] <- 
+            log(inv.logit(eta[data.currentCluster[, outcomes.var] == 1]))  
+          # draw a proposal candidate beta from a symmetric random walk 
+          beta.star <- group.betas[group.cluster.assignments == h, 1] + rnorm(group.cluster.N[h])
+          eta.star <- (rep(beta.star, group.nobs[group.cluster.assignments == h]) + 
+                         data.currentCluster[, times.observation.var] * 
+                         rep(group.betas[group.cluster.assignments == h, 2], group.nobs[group.cluster.assignments == h]))
+          prob.star <- inv.logit(eta.star)
+          loglikelihood.star <- rep(0, nrow(data.currentCluster))
+          loglikelihood.star[data.currentCluster[, outcomes.var] == 0] <- 
+            log(1 - prob.star[data.currentCluster[, outcomes.var] == 0])  
+          loglikelihood.star[data.currentCluster[, outcomes.var] == 1] <- 
+            log(prob.star[data.currentCluster[, outcomes.var] == 1])  
           
-          ratio<-ls+dnorm(bs,pm,sqrt(pv),log=TRUE)-(l+dnorm(betas[c==h,1],pm,sqrt(pv),log=TRUE))
+          # subject level log likelihood
+          subject.loglikelihood.previous <- tapply(loglikelihood.previous, data.currentCluster[, ids.var], sum)
+          subject.loglikelihood.star <- tapply(loglikelihood.star, data.currentCluster[, ids.var], sum)
           
-          un<-1*(log(runif(ns[h]))<ratio)
-          betas[c==h,1][un==1]<-bs[un==1]
+          ratio <- (subject.loglikelihood.star + 
+                      dnorm(beta.star, prior.mean, sqrt(prior.var), log=TRUE) - 
+                      (subject.loglikelihood.previous + dnorm(betas[c==h,1], prior.mean, sqrt(prior.var), log=TRUE)))
           
+          update <- 1 * (log(runif(group.cluster.N[h])) < ratio)
+          group.betas[group.cluster.assignments == h, 1][update == 1] <- beta.star[update == 1]
         }
         
         ######  B1|B0 and U (Step 5 continued, draw random slope given intercept and u)
@@ -658,34 +664,70 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         covar = matrix(c(group.dp.cluster.sigma[1,2], group.dp.cluster.sigma[2,3]),1)
         # conditional prior mean/var
         prior.mean = as.numeric((means.currentCluster[2] + covar %*% inv.intU %*% 
-                                   t(betas.currentCluster[,c(1,3),drop=FALSE] - subjectMeans.currentCluster[,c(1,3),drop=FALSE])))
+                                   t(group.betas[group.cluster.assignments==h, c(1,3), drop=FALSE] - 
+                                       subjectMeans.currentCluster[,c(1,3),drop=FALSE])))
         prior.var = as.numeric((group.dp.cluster.sigma[2,2] - covar %*% inv.intU %*% t(covar)))
-        ## calculate the posterior mean and variance for the random intercept
-        posterior.var = 1 / ((1 / prior.var) + 
-                               (tapply(data.currentCluster[, times.observation.var]^2, 
-                                       data.currentCluster[, ids.var], sum) / 
-                                  sigma.error))
-        # calculate the posterior mean
-        if (is.null(covariates.var)) {
-          randomSlopes = (data.currentCluster[, times.observation.var]) * 
-            (data.currentCluster[,outcomes.var] - 
-               rep(group.betas[group.cluster.assignments==h, 1],
-                   group.nobs[group.cluster.assignments==h]))
-        } else {
-          randomSlopes = (data.currentCluster[, times.observation.var]) * 
-            (data.currentCluster[,outcomes.var] - 
-               rep(group.betas[group.cluster.assignments==h, 1],
-                   group.nobs[group.cluster.assignments==h]) - 
-               data.currentCluster[, covariates.var] %*% group.beta.covariates)
-        }
-        posterior.mean = (posterior.var * 
-                            ((prior.mean/prior.var) + 
-                               ((1/sigma.error) * 
-                                  tapply(randomSlopes, data.currentCluster[, ids.var],sum)))) 
-        # draw the random intercepts
-        group.betas[group.cluster.assignments == h, 2] = 
-          rnorm(group.cluster.N[h], posterior.mean, sqrt(posterior.var))
         
+        if (dist == "gaussian") {
+          ## calculate the posterior mean and variance for the random intercept
+          posterior.var = 1 / ((1 / prior.var) + 
+                                 (tapply(data.currentCluster[, times.observation.var]^2, 
+                                         data.currentCluster[, ids.var], sum) / 
+                                    sigma.error))
+          # calculate the posterior mean
+          if (is.null(covariates.var)) {
+            randomSlopes = (data.currentCluster[, times.observation.var]) * 
+              (data.currentCluster[,outcomes.var] - 
+                 rep(group.betas[group.cluster.assignments==h, 1],
+                     group.nobs[group.cluster.assignments==h]))
+          } else {
+            randomSlopes = (data.currentCluster[, times.observation.var]) * 
+              (data.currentCluster[,outcomes.var] - 
+                 rep(group.betas[group.cluster.assignments==h, 1],
+                     group.nobs[group.cluster.assignments==h]) - 
+                 data.currentCluster[, covariates.var] %*% group.beta.covariates)
+          }
+          posterior.mean = (posterior.var * 
+                              ((prior.mean/prior.var) + 
+                                 ((1/sigma.error) * 
+                                    tapply(randomSlopes, data.currentCluster[, ids.var],sum)))) 
+          # draw the random intercepts
+          group.betas[group.cluster.assignments == h, 2] = 
+            rnorm(group.cluster.N[h], posterior.mean, sqrt(posterior.var))
+        } else {
+          # binary update
+          # Current Observation-Level Log-Likelihood
+          eta <- (rep(group.betas[group.cluster.assignments == h, 1], group.nobs[group.cluster.assignments == h]) + 
+                    data.currentCluster[, times.observation.var] * 
+                    rep(group.betas[group.cluster.assignments == h, 2], group.nobs[group.cluster.assignments == h]))
+          loglikelihood.previous <- rep(0, nrow(data.currentCluster))
+          loglikelihood.previous[data.currentCluster[, outcomes.var] == 0] <- 
+            log(1 - inv.logit(eta[data.currentCluster[, outcomes.var] == 0]))  
+          loglikelihood.previous[data.currentCluster[, outcomes.var] == 1] <- 
+            log(inv.logit(eta[data.currentCluster[, outcomes.var] == 1]))  
+          # draw a proposal candidate beta from a symmetric random walk 
+          beta.star <- group.betas[group.cluster.assignments == h, 2] + rnorm(group.cluster.N[h])
+          eta.star <- (rep(group.betas[group.cluster.assignments == h, 1], group.nobs[group.cluster.assignments == h]) + 
+                         data.currentCluster[, times.observation.var] * 
+                         rep(beta.star, group.nobs[group.cluster.assignments == h]))
+          prob.star <- inv.logit(eta.star)
+          loglikelihood.star <- rep(0, nrow(data.currentCluster))
+          loglikelihood.star[data.currentCluster[, outcomes.var] == 0] <- 
+            log(1 - prob.star[data.currentCluster[, outcomes.var] == 0])  
+          loglikelihood.star[data.currentCluster[, outcomes.var] == 1] <- 
+            log(prob.star[data.currentCluster[, outcomes.var] == 1])  
+          
+          # subject level log likelihood
+          subject.loglikelihood.previous <- tapply(loglikelihood.previous, data.currentCluster[, ids.var], sum)
+          subject.loglikelihood.star <- tapply(loglikelihood.star, data.currentCluster[, ids.var], sum)
+          
+          ratio <- (subject.loglikelihood.star + 
+                      dnorm(beta.star, prior.mean, sqrt(prior.var), log=TRUE) - 
+                      (subject.loglikelihood.previous + dnorm(betas[c==h,2], prior.mean, sqrt(prior.var), log=TRUE)))
+          
+          update <- 1 * (log(runif(group.cluster.N[h])) < ratio)
+          group.betas[group.cluster.assignments == h, 2][update == 1] <- beta.star[update == 1]
+        }
         # calculating the subject specific deviations from the cluster means
         # used to simplify calculation of the covariance
         #calculate betas minus their means
