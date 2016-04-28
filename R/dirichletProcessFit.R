@@ -653,7 +653,9 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
           
           ratio <- (subject.loglikelihood.star + 
                       dnorm(beta.star, prior.mean, sqrt(prior.var), log=TRUE) - 
-                      (subject.loglikelihood.previous + dnorm(betas[c==h,1], prior.mean, sqrt(prior.var), log=TRUE)))
+                      (subject.loglikelihood.previous + 
+                         dnorm(group.betas[group.cluster.assignments == h, 1], prior.mean, 
+                               sqrt(prior.var), log=TRUE)))
           
           update <- 1 * (log(runif(group.cluster.N[h])) < ratio)
           group.betas[group.cluster.assignments == h, 1][update == 1] <- beta.star[update == 1]
@@ -723,7 +725,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
           
           ratio <- (subject.loglikelihood.star + 
                       dnorm(beta.star, prior.mean, sqrt(prior.var), log=TRUE) - 
-                      (subject.loglikelihood.previous + dnorm(betas[c==h,2], prior.mean, sqrt(prior.var), log=TRUE)))
+                      (subject.loglikelihood.previous + dnorm(group.betas[group.cluster.assignments == h, 2], prior.mean, sqrt(prior.var), log=TRUE)))
           
           update <- 1 * (log(runif(group.cluster.N[h])) < ratio)
           group.betas[group.cluster.assignments == h, 2][update == 1] <- beta.star[update == 1]
@@ -867,7 +869,57 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         model.current$betas.covariates = rmvnorm(1,m,var)
         
       } else {
-        # metropolis hastings
+        # binary case, need to do metropolis hastings
+        residuals = data[, outcomes.var] - intercepts - slopes * data[, times.observation.var]
+        var = solve(prior.sigma.inv + crossprod(data[,covariates.var]) * sigma.error.inv)
+        
+        # build components of eta
+        y <- as.matrix(outcomes)
+        C = as.matrix(covariates)
+        cBeta = as.vector(C %*% betaCovariates.previous)
+        XTheta.previous = X.previous %*% Theta.previous 
+        # calculate the previous eta and associated probability
+        eta.previous = as.vector(XTheta.previous + cBeta)
+        prob.previous = inv.logit(eta.previous)
+        # adjust probabilities within tolerance levels
+        prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
+        prob.previous[prob.previous < model.options$prob.max] <-  model.options$prob.max
+        loglikelihood.previous <- sum(log((1 - prob.previous[y==0]))) + sum(log(prob.previous[y==1]))    
+        
+        # build y-tilde
+        r0.inv = solve(model.options$betas.covariates.sigma)
+        yt = cBeta + (y - prob.previous) * (1 / (prob.previous * (1 - prob.previous)))
+        # build the weight matrix
+        weight <- Diagonal(x = prob.previous * (1-prob.previous))
+        # build the covariance of the beta coefficients and make sure it is positive definite
+        covar <- as.matrix(nearPD(solve(r0.inv + crossprod(C, weight %*% C)))$mat)
+        # build the mean
+        mu <- covar  %*% (crossprod(C, weight %*% yt))
+        # draw the proposed coefficients for the fixed effects
+        betaCovariates.star <- rmvnorm(1, mu, covar)
+        
+        # get proposal probabilities
+        eta.star <- XTheta.previous + C %*% betaCovariates.star
+        prob.star = inv.logit(eta.star)
+        # adjust probabilities within tolerance levels
+        prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
+        prob.star[prob.star < model.options$prob.max] <-  model.options$prob.max
+        loglikelihood.star <- sum(log((1 - prob.star[y == 0]))) + sum(log(prob.star[y == 1]))    
+        
+        y.star <- cBeta.star + (y - prob.star) * (1 / (prob.star * (1 - prob.star)))
+        weight.star <- Diagonal(x=prob.star * (1 - prob.star))
+        covar.star <- as.matrix(nearPD(solve(r0.inv + crossprod(C, weight.star %*% C)))$mat)
+        mu.star <- covar.star %*% (crossprod(C,weight.star%*%y.star))
+        
+        # Metropolis hastings step
+        rho <- (loglikelihood.star - loglikelihood.previous + 
+                  log(dmvnorm(as.vector(betaCovariates.star), as.vector(mu.star), covar.star)) - 
+                  log(dmvnorm(as.vector(betaCovariates.star), as.vector(mu), covar)) +
+                  (crossprod(as.vector(betaCovariates.star)) - tcrossprod(prob.star))/ (2 * sigma.beta))
+        
+        if (rho > log(runif(1))) {
+          model.current$betas.covariates = betaCovariates.star
+        }
       }
     }
     

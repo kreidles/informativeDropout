@@ -116,7 +116,102 @@ example.dp_gaussian_1group_nocovar <- function() {
 
 
 
-
+example.dp_binary_1group_nocovar <- function() {
+  data <- read.table("../Rnsv/code/sim_sml_1.dat")
+  #data$day = data$years * 365
+  
+  names(data) <- c("patid", "alpha", "drptm", "b1", "b2",
+                   "b2ui", "b2uii", "b2uiii", "t", "e", "yi", "yii", "yiii")
+  data$group <- rep(1,nrow(data))
+  data$yi_bin = (data$yi> 0)
+  # for debugging
+  ids.var = "patid"
+  outcomes.var = "yi_bin"
+  groups.var = "group"
+  covariates.var = NULL
+  times.dropout.var = "drptm"
+  times.observation.var = "t"
+  method="bayes.dirichlet"
+  dist = "binary"
+  
+  model.options=dirichlet.model.options(iterations=10, n.clusters=15, burnin=0,
+                                        dropout.estimationTimes = seq(1/15,1,1/15),
+                                        dp.concentration=1,
+                                        dp.concentration.alpha=1,
+                                        dp.concentration.beta=1,
+                                        dp.cluster.sigma = diag(3),
+                                        dp.cluster.sigma.nu0 = 5,
+                                        dp.cluster.sigma.T0 = diag(3),
+                                        dp.dist.mu0 = c(0,0,0),
+                                        dp.dist.mu0.mb = c(0,0,0),
+                                        dp.dist.mu0.Sb = diag(3),
+                                        dp.dist.sigma0 = diag(3),
+                                        dp.dist.sigma0.nub = 5,
+                                        dp.dist.sigma0.Tb = diag(3),
+                                        betas.covariates = NULL,
+                                        betas.covariates.mu = NULL,
+                                        betas.covariates.sigma = NULL)
+  
+  
+  set.seed(1066)
+  result = informativeDropout.bayes.dirichlet(data, ids.var, 
+                                              outcomes.var, groups.var,
+                                              covariates.var, 
+                                              times.dropout.var, times.observation.var,
+                                              dist, model.options)
+  #   result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
+  #                               times.dropout.var, times.observation.var, 
+  #                               method, dist,
+  #                               knots.options = knots.options, 
+  #                               mcmc.options = mcmc.options,
+  #                               model.options = model.options,
+  #                               dropoutEstimationTimes = dropoutEstimationTimes)
+  #   
+  #   
+  #   acceptanceProbability(result, "knot.add")
+  #   acceptanceProbability(result, "knot.remove")
+  #   acceptanceProbability(result, "knot.move")
+  #   acceptanceProbability(result, "fixedEffects")
+  #   #acceptanceProbability(result, "fixedEffectsCovariates")
+  #   
+  #   
+  #   nknots = unlist(lapply(result, function(x) { return(length(x$knots[[1]])) } ))
+  #   ts.plot(nknots)
+  #   summary(nknots)
+  #   
+  #   slopes = unlist(lapply(result, function(x) { return(x$slope.marginal[[1]]) }))
+  #   summary(slopes)
+  #   ts.plot(slopes)
+  #   
+  #   sum.sigma.error = unlist(lapply(result, function(x) { return(x$sigma.error) }))
+  #   summary(sum.sigma.error)
+  #   ts.plot(sum.sigma.error)
+  #   
+  #   sum.sigma.randomIntercept = unlist(lapply(result, function(x) { return(x$sigma.randomIntercept) }))
+  #   summary(sum.sigma.randomIntercept)
+  #   ts.plot(sum.sigma.randomIntercept)
+  #   
+  #   sum.sigma.randomSlope = unlist(lapply(result, function(x) { return(x$sigma.randomSlope) }))
+  #   summary(sum.sigma.randomSlope)
+  #   ts.plot(sum.sigma.randomSlope)
+  #   
+  #   sum.sigma.randomInterceptSlope = unlist(lapply(result, function(x) { return(x$sigma.randomInterceptSlope) }))
+  #   summary(sum.sigma.randomInterceptSlope)
+  #   ts.plot(sum.sigma.randomInterceptSlope)
+  #   
+  #   
+  #   dropout.slopes1 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][1])}))
+  #   summary(dropout.slopes1)
+  #   ts.plot(dropout.slopes1)
+  #   
+  #   dropout.slopes2 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][2])}))
+  #   summary(dropout.slopes2)
+  #   ts.plot(dropout.slopes2)
+  #   
+  #   dropout.slopes3 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][3])}))
+  #   summary(dropout.slopes3)
+  #   ts.plot(dropout.slopes3)
+}
 
 
 

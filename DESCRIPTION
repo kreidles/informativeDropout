@@ -1,9 +1,15 @@
 Package: informativeDropout
 Type: Package
-Title: informativeDropout: varying coefficient models to account for informative dropout
-Version: 1.0
+Title: informativeDropout: varying coefficient models to account for informative
+    dropout
+Version: 1.0.0
 Date: 2015-08-02
 Author: Sarah Kreidler
 Maintainer: Sarah Kreidler <skreidler@neptuneinc.org>
-Description: Varying coefficient models to account for informative dropout in longitudinal studies
+Description: Varying coefficient models to account for informative dropout in
+    longitudinal studies
 License: GPLv3
+RoxygenNote: 5.0.1
+Suggests: knitr,
+    rmarkdown
+VignetteBuilder: knitr
