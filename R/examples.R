@@ -134,7 +134,7 @@ example.dp_binary_1group_nocovar <- function() {
   method="bayes.dirichlet"
   dist = "binary"
   
-  model.options=dirichlet.model.options(iterations=10, n.clusters=15, burnin=0,
+  model.options=dirichlet.model.options(iterations=1000, n.clusters=15, burnin=0,
                                         dropout.estimationTimes = seq(1/15,1,1/15),
                                         dp.concentration=1,
                                         dp.concentration.alpha=1,
@@ -213,7 +213,54 @@ example.dp_binary_1group_nocovar <- function() {
   #   ts.plot(dropout.slopes3)
 }
 
-
+example.dp_binary_1group_covar <- function() {
+  data <- read.table("../Rnsv/code/sim_sml_1.dat")
+  #data$day = data$years * 365
+  
+  names(data) <- c("patid", "alpha", "drptm", "b1", "b2",
+                   "b2ui", "b2uii", "b2uiii", "t", "e", "yi", "yii", "yiii")
+  data$group <- rep(1,nrow(data))
+  data$yi_bin = (data$yi> 0)
+  data$gender = data$yi_bin
+  data$gender[data$yi_bin == 1] <- as.numeric(runif(length(data$yi_bin[data$yi_bin == 1])) > 0.8)
+  data$gender[data$yi_bin == 0] <- as.numeric(runif(length(data$yi_bin[data$yi_bin == 0])) > 0.15)
+  
+  # for debugging
+  ids.var = "patid"
+  outcomes.var = "yi_bin"
+  groups.var = "group"
+  covariates.var = "gender"
+  times.dropout.var = "drptm"
+  times.observation.var = "t"
+  method="bayes.dirichlet"
+  dist = "binary"
+  
+  model.options=dirichlet.model.options(iterations=1000, n.clusters=15, burnin=0,
+                                        dropout.estimationTimes = seq(1/15,1,1/15),
+                                        dp.concentration=1,
+                                        dp.concentration.alpha=1,
+                                        dp.concentration.beta=1,
+                                        dp.cluster.sigma = diag(3),
+                                        dp.cluster.sigma.nu0 = 5,
+                                        dp.cluster.sigma.T0 = diag(3),
+                                        dp.dist.mu0 = c(0,0,0),
+                                        dp.dist.mu0.mb = c(0,0,0),
+                                        dp.dist.mu0.Sb = diag(3),
+                                        dp.dist.sigma0 = diag(3),
+                                        dp.dist.sigma0.nub = 5,
+                                        dp.dist.sigma0.Tb = diag(3),
+                                        betas.covariates = NULL,
+                                        betas.covariates.mu = 0,
+                                        betas.covariates.sigma = matrix(0.7))
+  
+  
+  set.seed(1066)
+  result = informativeDropout.bayes.dirichlet(data, ids.var, 
+                                              outcomes.var, groups.var,
+                                              covariates.var, 
+                                              times.dropout.var, times.observation.var,
+                                              dist, model.options)
+}
 
 
 runExamples <- function() {

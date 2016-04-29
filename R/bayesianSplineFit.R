@@ -1292,10 +1292,11 @@ getInitialEstimatesCovariates <- function(dist, covariates, outcomes) {
   if (dist == 'gaussian') {
     fit.beta <- lm(formula, data=data.covar)
     return (as.vector(coef(fit.beta))[-1])
-  } else {
-    family = ifelse(dist == 'poisson', poisson(link = "log"), binomial(link = "logit"))
-    fit.beta <- glm(formula, family=family, data=data.covar)
+  } else if (dist == 'binary') {
+    fit.beta <- glm(formula, family=binomial, data=data.covar)
     return (as.vector(coef(fit.beta))[-1])
+  } else {
+    stop("unsupported distribution")
   }
 }
 
