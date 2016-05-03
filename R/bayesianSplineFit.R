@@ -188,12 +188,16 @@ bayes.splines.model.options = function(iterations=10000, burnin=500, thin=NA,
 #'
 #'
 #'
-addKnot.binary <- function(knots.previous, outcomes, 
+addKnot.binary <- function(model.options, knots.previous, outcomes, 
                            times.dropout, times.observation, 
                            covariates, X.previous, Theta.previous,
-                           Z, alpha, betaCovariates, 
-                           sigma.beta, sigma.residual, lambda.numKnots, eta.null,
-                           model.options) {
+                           Z, alpha, betaCovariates) {
+  
+  # get the relevant priors from the model options
+  sigma.residual <- model.options$sigma.residual
+  sigma.beta <- model.options$sigma.beta
+  lambda.numKnots <- model.options$lambda.numKnots
+  eta.null <- model.options$eta.null
   
   # add a knot by randomly selecting a candidate knot
   candidatesPositions = model.options$candidatePositions[! model.options$candidatePositions %in% knots.previous]
@@ -240,8 +244,8 @@ addKnot.binary <- function(knots.previous, outcomes,
   }
   
   # Calculate birth and death probabilities                                                        
-  probBirth <- ifelse(length(knots.previous) == model.options$min, 1, model.options$birthProbability)
-  probDeath <- ifelse(length(knots.previous) == model.options$max - 1, 1, 1 - model.options$birthProbability)
+  probBirth <- ifelse(length(knots.previous) == model.options$min, 1, model.options$knots.prob.birth)
+  probDeath <- ifelse(length(knots.previous) == model.options$max - 1, 1, 1 - model.options$knots.prob.birth)
   
   # calculate the previous eta and associated probability
   eta.previous = as.vector(X.previous %*% Theta.previous + cBeta + zAlpha)
@@ -289,15 +293,20 @@ addKnot.binary <- function(knots.previous, outcomes,
 #' @return 
 #' @examples
 #' 
-addKnot.gaussian <- function(knots.previous, outcomes, 
+addKnot.gaussian <- function(model.options, knots.previous, outcomes, 
                              times.dropout, times.observation, 
                              covariates, X.previous, Theta.previous,
                              Z, alpha, betaCovariates, 
                              sigma.beta, sigma.residual, sigma.error, lambda.numKnots) {
   
+  # get the relevant priors from the model options
+  sigma.residual <- model.options$sigma.residual
+  sigma.beta <- model.options$sigma.beta
+  lambda.numKnots <- model.options$lambda.numKnots
+  
   # add a knot by randomly selecting a candidate knot
-  candidatesPositions = model.options$candidatePositions[! model.options$candidatePositions %in% knots.previous]
-  newKnot.value = sample(candidatesPositions, 1)
+  candidatePositions = model.options$candidatePositions[!(model.options$candidatePositions %in% knots.previous)]
+  newKnot.value = sample(candidatePositions, 1)
   knots.star <- sort(c(knots.previous, newKnot.value))
   # get the interior and boundary knots, and grab the position of the knot that
   # was just added
@@ -345,8 +354,8 @@ addKnot.gaussian <- function(knots.previous, outcomes,
   }
   
   # Calculate birth and death probabilities                                                        
-  probBirth <- ifelse(length(knots.previous) == model.options$min, 1, model.options$birthProbability)
-  probDeath <- ifelse(length(knots.previous) == model.options$max - 1, 1, 1 - model.options$birthProbability)
+  probBirth <- ifelse(length(knots.previous) == model.options$min, 1, model.options$knots.prob.birth)
+  probDeath <- ifelse(length(knots.previous) == model.options$max - 1, 1, 1 - model.options$knots.prob.birth)
   
   # Calculate residuals for likelihood ratio
   if (!is.null(covariates)) {
@@ -384,11 +393,15 @@ addKnot.gaussian <- function(knots.previous, outcomes,
 #' @return 
 #' @examples
 #' 
-removeKnot.binary <- function(dist, knots.previous, outcomes, times.dropout, 
+removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dropout, 
                               times.observation, covariates,
-                              X.previous, Theta.previous, Z, alpha, betaCovariates, 
-                              sigma.beta, sigma.residual, lambda.numKnots, eta.null,
-                              model.options) {
+                              X.previous, Theta.previous, Z, alpha, betaCovariates) {
+  
+  # get the relevant priors from the model options
+  sigma.residual <- model.options$sigma.residual
+  sigma.beta <- model.options$sigma.beta
+  lambda.numKnots <- model.options$lambda.numKnots
+  eta.null <- model.options$eta.null
   
   # randomly remove an existing knot
   index = sample(1:length(knots.previous), 1)
@@ -448,9 +461,9 @@ removeKnot.binary <- function(dist, knots.previous, outcomes, times.dropout,
   
   # Calculate birth and death probabilities                                                        
   probBirth <- ifelse(length(knots.star) == model.options$min, 
-                      1, model.options$birthProbability)
+                      1, model.options$knots.prob.birth)
   probDeath <- ifelse(length(knots.previous) == model.options$max, 
-                      1, 1 - model.options$birthProbability)
+                      1, 1 - model.options$knots.prob.birth)
   
   #Calculate Acceptance Probability  
   rho <- (-log(lambda.numKnots) + 
@@ -482,11 +495,15 @@ removeKnot.binary <- function(dist, knots.previous, outcomes, times.dropout,
 #' @return 
 #' @examples
 #' 
-removeKnot.gaussian <- function(dist, knots.previous, model.options, 
+removeKnot.gaussian <- function(model.options, knots.previous, 
                                 outcomes, times.dropout, times.observation, covariates,
                                 X.previous, Theta.previous, 
-                                Z, alpha, betaCovariates, sigma.residual,  
-                                sigma.error, sigma.beta, lambda.numKnots) {
+                                Z, alpha, betaCovariates, sigma.error) {
+  
+  # get the relevant priors from the model options
+  sigma.residual <- model.options$sigma.residual
+  sigma.beta <- model.options$sigma.beta
+  lambda.numKnots <- model.options$lambda.numKnots
   
   # randomly remove an existing knot
   index = sample(1:length(knots.previous), 1)
@@ -537,9 +554,9 @@ removeKnot.gaussian <- function(dist, knots.previous, model.options,
   
   # Calculate birth and death probabilities                                                        
   probBirth <- ifelse(length(knots.star) == model.options$min, 
-                      1, model.options$birthProbability)
+                      1, model.options$knots.prob.birth)
   probDeath <- ifelse(length(knots.previous) == model.options$max, 
-                      1, 1 - model.options$birthProbability)
+                      1, 1 - model.options$knots.prob.birth)
   
   #Calculate Acceptance Probability                                                        
   rho <- (-log(lambda.numKnots) + 
@@ -570,10 +587,21 @@ removeKnot.gaussian <- function(dist, knots.previous, model.options,
 #' @examples
 #' add(1, 1)
 #' add(10, 1)
-moveKnot.binary <- function(dist, knots.previous, knots.stepSize, knots.candidatePositions,
+moveKnot.binary <- function(model.options, knots.previous, 
                             outcomes, times.dropout, times.observation, covariates,
                             X.previous, Theta.previous, 
-                            Z, alpha, betaCovariates, eta.null) {
+                            Z, alpha, betaCovariates) {
+  
+  # get the relevant priors from the model options
+  # priors
+  sigma.residual <- model.options$sigma.residual
+  sigma.beta <- model.options$sigma.beta
+  lambda.numKnots <- model.options$lambda.numKnots
+  eta.null <- model.options$eta.null
+  # candidate positions
+  potentialLocations = model.options$candidatePositions[! model.options$candidatePositions %in% knots.previous]
+  # step size for moving a knot
+  knots.stepSize = model.options$knots.setSize
   
   #Pick a knot to move 
   knotToMove <- sample(knots.previous, 1) 
@@ -583,9 +611,6 @@ moveKnot.binary <- function(dist, knots.previous, knots.stepSize, knots.candidat
   knotsToKeep <- knots.previous[-index] 
   
   # find a new location from the potential knot locations
-  # TODO: floating point issue not recognizing existing knot positions
-  potentialLocations <- 
-    knots.candidatePositions[!(knots.candidatePositions %in% knots.previous)]
   # here we only allow movement within some small window
   potentialLocations <- 
     potentialLocations[potentialLocations > (knotToMove - knots.stepSize) & 
@@ -655,10 +680,21 @@ moveKnot.binary <- function(dist, knots.previous, knots.stepSize, knots.candidat
 #' @examples
 #' add(1, 1)
 #' add(10, 1)
-moveKnot.gaussian <- function(dist, knots.previous, knots.stepSize, knots.candidatePositions,
+moveKnot.gaussian <- function(model.options, knots.previous, 
                               outcomes, times.dropout, times.observation, covariates,
                               X.previous, Theta.previous, 
                               Z, alpha, betaCovariates, sigma.error) {
+  
+  # get the relevant priors from the model options
+  # priors
+  sigma.residual <- model.options$sigma.residual
+  sigma.beta <- model.options$sigma.beta
+  lambda.numKnots <- model.options$lambda.numKnots
+  # candidate positions
+  potentialLocations = model.options$candidatePositions[! model.options$candidatePositions %in% knots.previous]
+  # step size for moving a knot
+  knots.stepSize = model.options$knots.setSize
+  
   #Pick a knot to move 
   knotToMove <- sample(knots.previous, 1) 
   # get index of knot to be moved
@@ -667,9 +703,6 @@ moveKnot.gaussian <- function(dist, knots.previous, knots.stepSize, knots.candid
   knotsToKeep <- knots.previous[-index] 
   
   # find a new location from the potential knot locations
-  # TODO: floating point issue not recognizing existing knot positions
-  potentialLocations <- 
-    knots.candidatePositions[!(knots.candidatePositions %in% knots.previous)]
   # here we only allow movement within some small window
   potentialLocations <- 
     potentialLocations[potentialLocations > (knotToMove - knots.stepSize) & 
@@ -733,10 +766,16 @@ moveKnot.gaussian <- function(dist, knots.previous, knots.stepSize, knots.candid
 #' @examples
 #' add(1, 1)
 #' add(10, 1)
-updateFixedEffects.binary <- function(knots.previous, outcomes, times.dropout, times.observation, covariates,
+updateFixedEffects.binary <- function(model.options, knots.previous, 
+                                      outcomes, times.dropout, times.observation, covariates,
                                       X.previous, Theta.previous, 
-                                      Z, alpha, betaCovariates, 
-                                      sigma.beta, lambda.numKnots, eta.null, model.options) {
+                                      Z, alpha, betaCovariates) {
+  
+  # get the relevant priors from the model options
+  # priors
+  sigma.beta <- model.options$sigma.beta
+  lambda.numKnots <- model.options$lambda.numKnots
+  eta.null <- model.options$eta.null
   
   # build components of eta
   y <- as.matrix(outcomes)
@@ -805,11 +844,15 @@ updateFixedEffects.binary <- function(knots.previous, outcomes, times.dropout, t
 #' @examples
 #' add(1, 1)
 #' add(10, 1)
-updateFixedEffects.gaussian <- function(dist, knots.previous, model.options, 
+updateFixedEffects.gaussian <- function(model.options, knots.previous, 
                                         outcomes, times.dropout, times.observation, covariates,
                                         X.previous, Theta.previous, 
-                                        Z, alpha, betaCovariates,  
-                                        sigma.error, sigma.beta, lambda.numKnots) {
+                                        Z, alpha, betaCovariates, sigma.error) {
+  
+  # get the relevant priors from the model options
+  # priors
+  sigma.beta <- model.options$sigma.beta
+  lambda.numKnots <- model.options$lambda.numKnots
   
   # create the covariance matrix for the intercept and theta coefficients for the splines - R0
   covarIntTheta <- diag(rep(sigma.beta, (length(knots.previous)+1))) 
@@ -862,9 +905,11 @@ updateFixedEffects.gaussian <- function(dist, knots.previous, model.options,
 #' Update the regression coefficients related to common
 #' covariates and group effects
 #'
-updateFixedEffectsCovariates.binary <- function(outcomes, covariates, 
+updateFixedEffectsCovariates.binary <- function(model.options, outcomes, covariates, 
                                                 X, Theta, Z, alpha, betaCovariates.previous,  
                                                 sigma.error, sigma.beta) {
+  sigma.beta <- model.options$sigma.beta
+  
   # make sure there are covariates to update 
   if (is.null(covariates)) {
     return (list(betaCovariates=NULL, accepted=FALSE))
@@ -1456,36 +1501,18 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
           (length(model.current$knots[[group.index]]) <= model.options$min)) {
         if (dist == "gaussian") {
           # add a knot
-          result = addKnot.gaussian(knots.previous=model.current$knots[[group.index]], 
-                                    model.options=model.options, 
-                                    outcomes=group.outcomes, 
-                                    times.dropout=group.times.dropout, 
-                                    times.observation=group.times.observation, 
-                                    covariates=group.covariates,
-                                    X.previous=X[[group.index]], 
-                                    Theta.previous=model.current$Theta[[group.index]],
-                                    Z=group.Z, alpha=group.alpha, 
-                                    betaCovariates=model.current$betaCovariates,  
-                                    sigma.residual=mcmc.options$sigma.residual,
-                                    sigma.error=model.current$sigma.error, 
-                                    sigma.beta=prior.options$sigma.beta, 
-                                    lambda.numKnots=prior.options$lambda.numKnots)
+          result = addKnot.gaussian(model.options, model.current$knots[[group.index]], 
+                                    group.outcomes, group.times.dropout, group.times.observation, 
+                                    group.covariates, X.previous=X[[group.index]], 
+                                    model.current$Theta[[group.index]], group.Z, group.alpha, 
+                                    model.current$betaCovariates,  
+                                    sigma.error=model.current$sigma.error)
         } else {
           # binary case
-          result = addKnot.binary(knots.previous=model.current$knots[[group.index]], 
-                                  model.options=model.options, 
-                                  outcomes=group.outcomes, 
-                                  times.dropout=group.times.dropout, 
-                                  times.observation=group.times.observation, 
-                                  covariates=group.covariates,
-                                  X.previous=X[[group.index]], 
-                                  Theta.previous=model.current$Theta[[group.index]],
-                                  Z=group.Z, alpha=group.alpha, 
-                                  betaCovariates=model.current$betaCovariates,  
-                                  sigma.residual=mcmc.options$sigma.residual,
-                                  sigma.error=model.current$sigma.error, 
-                                  sigma.beta=prior.options$sigma.beta, 
-                                  lambda.numKnots=prior.options$lambda.numKnots)
+          result = addKnot.binary(model.options, model.current$knots[[group.index]], group.outcomes, 
+                                  group.times.dropout, group.times.observation, 
+                                  group.covariates, X[[group.index]], model.current$Theta[[group.index]],
+                                  group.Z, group.alpha, model.current$betaCovariates)
         }
         
         # update the model iteration
@@ -1497,38 +1524,18 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
         
       } else {
         if (dist == "gaussian") {
-          
           # remove a knot
-          result = removeKnot.gaussian(dist=dist, knots.previous=model.current$knots[[group.index]], 
-                                       model.options=model.options, 
-                                       outcomes=group.outcomes, 
-                                       times.dropout=group.times.dropout, 
-                                       times.observation=group.times.observation, 
-                                       covariates=group.covariates,
-                                       X.previous=X[[group.index]], 
-                                       Theta.previous=model.current$Theta[[group.index]],
-                                       Z=group.Z, alpha=group.alpha, 
-                                       betaCovariates=model.current$betaCovariates,  
-                                       sigma.residual=mcmc.options$sigma.residual,
-                                       sigma.error=model.current$sigma.error, 
-                                       sigma.beta=prior.options$sigma.beta, 
-                                       lambda.numKnots=prior.options$lambda.numKnots)  
+          result = removeKnot.gaussian(model.options, model.current$knots[[group.index]], 
+                                       group.outcomes, group.times.dropout, group.times.observation, 
+                                       group.covariates, X[[group.index]], model.current$Theta[[group.index]],
+                                       group.Z, group.alpha, model.current$betaCovariates, model.current$sigma.error)
         } else {
           # remove a knot
-          result = removeKnot.binary(dist=dist, knots.previous=model.current$knots[[group.index]], 
-                                     model.options=model.options, 
-                                     outcomes=group.outcomes, 
-                                     times.dropout=group.times.dropout, 
-                                     times.observation=group.times.observation, 
-                                     covariates=group.covariates,
-                                     X.previous=X[[group.index]], 
-                                     Theta.previous=model.current$Theta[[group.index]],
-                                     Z=group.Z, alpha=group.alpha, 
-                                     betaCovariates=model.current$betaCovariates,  
-                                     sigma.residual=mcmc.options$sigma.residual,
-                                     sigma.error=model.current$sigma.error, 
-                                     sigma.beta=prior.options$sigma.beta, 
-                                     lambda.numKnots=prior.options$lambda.numKnots)  
+          result = removeKnot.binary(model.options, model.current$knots[[group.index]], 
+                                     group.outcomes, group.times.dropout, 
+                                     group.times.observation, group.covariates,
+                                     X[[group.index]], model.current$Theta[[group.index]], 
+                                     group.Z, group.alpha, model.current$betaCovariates)
         }
         # update the model iteration
         X[[group.index]] = result$X
@@ -1541,33 +1548,18 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       print (length(model.current$knots[[group.index]]))
       # Move knots
       if (dist == "gaussian") {
-        
-        
-        result = moveKnot.gaussian(dist=dist, knots.previous=model.current$knots[[group.index]], 
-                                   knots.stepSize=model.options$stepSize, 
-                                   knots.candidatePositions=model.options$candidatePositions,
-                                   outcomes=group.outcomes, 
-                                   times.dropout=group.times.dropout, 
-                                   times.observation=group.times.observation, 
-                                   covariates=group.covariates,
-                                   X.previous=X[[group.index]], 
-                                   Theta.previous=model.current$Theta[[group.index]],
-                                   Z=group.Z, alpha=group.alpha, 
-                                   betaCovariates=model.current$betaCovariates,  
-                                   sigma.error=model.current$sigma.error)
+        result = moveKnot.gaussian(model.options, model.current$knots[[group.index]], 
+                                   group.outcomes, group.times.dropout, group.times.observation, 
+                                   group.covariates,
+                                   X[[group.index]], model.current$Theta[[group.index]], 
+                                   group.Z, group.alpha, model.current$betaCovariates, 
+                                   model.current$sigma.error)
       } else {
-        result = moveKnot.binary(dist=dist, knots.previous=model.current$knots[[group.index]], 
-                                 knots.stepSize=model.options$stepSize, 
-                                 knots.candidatePositions=model.options$candidatePositions,
-                                 outcomes=group.outcomes, 
-                                 times.dropout=group.times.dropout, 
-                                 times.observation=group.times.observation, 
-                                 covariates=group.covariates,
-                                 X.previous=X[[group.index]], 
-                                 Theta.previous=model.current$Theta[[group.index]],
-                                 Z=group.Z, alpha=group.alpha, 
-                                 betaCovariates=model.current$betaCovariates,  
-                                 sigma.error=model.current$sigma.error)
+        result = moveKnot.binary(model.options, model.current$knots[[group.index]], 
+                                 group.outcomes, group.times.dropout, group.times.observation, 
+                                 group.covariates,
+                                 X[[group.index]], model.current$Theta[[group.index]], 
+                                 group.Z, group.alpha, model.current$betaCovariates)
       }
       X[[group.index]] = result$X
       model.current$knots[[group.index]] = result$knots
@@ -1577,37 +1569,16 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       # update fixed effects (includes coefficients for covariates and time varying slopes)
       print("FIXED")
       if (dist == "gaussian") {
-        result = updateFixedEffects.gaussian(dist=dist,
-                                             knots.previous=model.current$knots[[group.index]], 
-                                             model.options=model.options, 
-                                             outcomes=group.outcomes, 
-                                             times.dropout=group.times.dropout, 
-                                             times.observation=group.times.observation, 
-                                             covariates=group.covariates,
-                                             X.previous=X[[group.index]], 
-                                             Theta.previous=model.current$Theta[[group.index]],
-                                             Z=group.Z, 
-                                             alpha=group.alpha, 
-                                             betaCovariates=model.current$betaCovariates,  
-                                             sigma.error=model.current$sigma.error, 
-                                             sigma.beta=prior.options$sigma.beta, 
-                                             lambda.numKnots=prior.options$lambda.numKnots)
+        result = updateFixedEffects.gaussian(model.options, model.current$knots[[group.index]], 
+                                             group.outcomes, group.times.dropout, group.times.observation, 
+                                             group.covariates, X[[group.index]], model.current$Theta[[group.index]], 
+                                             group.Z, group.alpha, model.current$betaCovariates, 
+                                             model.current$sigma.error)
       } else {
-        result = updateFixedEffects.binary(dist=dist,
-                                           knots.previous=model.current$knots[[group.index]], 
-                                           model.options=model.options, 
-                                           outcomes=group.outcomes, 
-                                           times.dropout=group.times.dropout, 
-                                           times.observation=group.times.observation, 
-                                           covariates=group.covariates,
-                                           X.previous=X[[group.index]], 
-                                           Theta.previous=model.current$Theta[[group.index]],
-                                           Z=group.Z, 
-                                           alpha=group.alpha, 
-                                           betaCovariates=model.current$betaCovariates,  
-                                           sigma.error=model.current$sigma.error, 
-                                           sigma.beta=prior.options$sigma.beta, 
-                                           lambda.numKnots=prior.options$lambda.numKnots)
+        result = updateFixedEffects.binary(model.options, model.current$knots[[group.index]], 
+                                           group.outcomes, group.times.dropout, group.times.observation, 
+                                           group.covariates, X[[group.index]], model.current$Theta[[group.index]], 
+                                           group.Z, group.alpha, model.current$betaCovariates)
       }
       model.current$Theta[[group.index]] = result$Theta
       model.current$proposed$fixedEffects = TRUE
@@ -1732,9 +1703,6 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     # save the current iteration
     modelIterationList[[i]] = model.current
   }
-  
-  # calculate the final estimates as the mean across the different iterations
-  
   
   # return the estimates, with distributions, and the model results from each iteration
   return (modelIterationList)
