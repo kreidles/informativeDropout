@@ -92,7 +92,7 @@ bayes.splines.iteration <- function(knots=NULL, Theta=NULL, betas.covariates=NUL
 #' @exportClass bayes.splines.model.options
 #' 
 bayes.splines.model.options = function(iterations=10000, burnin=500, thin=NA,
-                                       knots.prob.birth=0.5, knots.min=1, knots.max=NA,
+                                       knots.prob.birth=0.5, knots.min=1, knots.max=NA, knots.stepSize=3,
                                        knots.positions.start=NULL, knots.positions.candidate=NULL,
                                        prob.min=0.00001, prob.max=0.99999,
                                        dropout.estimationTimes=NULL,
@@ -154,6 +154,8 @@ bayes.splines.model.options = function(iterations=10000, burnin=500, thin=NA,
     knots.min = knots.min,
     # maximum number of knots,
     knots.max = knots.max,
+    # step size for moving a knot 
+    knots.stepSize = knots.stepSize,
     # starting positions for the knots
     knots.positions.start = knots.positions.start,
     # candidate positions for the knots
@@ -906,8 +908,9 @@ updateFixedEffects.gaussian <- function(model.options, knots.previous,
 #' covariates and group effects
 #'
 updateFixedEffectsCovariates.binary <- function(model.options, outcomes, covariates, 
-                                                X, Theta, Z, alpha, betaCovariates.previous,  
-                                                sigma.error, sigma.beta) {
+                                                X, Theta, Z, alpha, betaCovariates.previous) {
+  
+  # grab the relevant model options
   sigma.beta <- model.options$sigma.beta
   
   # make sure there are covariates to update 
@@ -975,9 +978,12 @@ updateFixedEffectsCovariates.binary <- function(model.options, outcomes, covaria
 #' Update the regression coefficients related to common
 #' covariates and group effects
 #'
-updateFixedEffectsCovariates.gaussian <- function(outcomes, covariates, 
+updateFixedEffectsCovariates.gaussian <- function(model.options, outcomes, covariates, 
                                                   X, Theta, Z, alpha, betaCovariates.previous,  
-                                                  sigma.error, sigma.beta) {
+                                                  sigma.error) {
+  
+  # grab the relevant model options
+  sigma.beta <- model.options$sigma.beta
   
   # build X * beta for each group and combine into a single vector
   cBeta = vector()
@@ -1035,12 +1041,12 @@ updateFixedEffectsCovariates.gaussian <- function(outcomes, covariates,
 #' @return 
 #' @examples
 #'
-updateRandomEffects.binary <- function(dist, numSubjects, numObservations, firstObsPerSubject,
+updateRandomEffects.binary <- function(numSubjects, numObservations, firstObsPerSubject,
                                        subjectsPerGroup, ids, outcomes, times.observation, 
                                        covariates, X, Theta, 
                                        Z, alpha, betaCovariates,  
                                        sigma.randomIntercept, sigma.randomSlope,
-                                       sigma.randomInterceptSlope, sigma.error) {
+                                       sigma.randomInterceptSlope) {
   
   # Update B1 and B2 using MH step
   
@@ -1080,7 +1086,7 @@ updateRandomEffects.binary <- function(dist, numSubjects, numObservations, first
 #' @return 
 #' @examples
 #'
-updateRandomEffects.gaussian <- function(dist, numSubjects, numObservations, firstObsPerSubject,
+updateRandomEffects.gaussian <- function(numSubjects, numObservations, firstObsPerSubject,
                                          subjectsPerGroup, ids, outcomes, times.observation, 
                                          covariates, X, Theta, 
                                          Z, alpha, betaCovariates,  
@@ -1159,14 +1165,14 @@ updateRandomEffects.gaussian <- function(dist, numSubjects, numObservations, fir
 #' add(1, 1)
 #' add(10, 1)
 #' 
-updateCovarianceParameters.binary <- function(numSubjects, firstObsPerSubject,
-                                              alpha, model.options) {
+updateCovarianceParameters.binary <- function(model.options, numSubjects, 
+                                              firstObsPerSubject, alpha) {
   
   
   # sample from an inverse wishart to update the covariance of the random effects
   perSubjectAlpha = alpha[firstObsPerSubject,]
-  sigma.alpha <- riwish(prior.options$sigmaError.df + numSubjects, 
-                        prior.options$sigmaError.scaleMatrix + crossprod(as.matrix(perSubjectAlpha)))
+  sigma.alpha <- riwish(model.options$sigmaError.df + numSubjects, 
+                        model.options$sigmaError.scaleMatrix + crossprod(as.matrix(perSubjectAlpha)))
   
   sigma.randomIntercept = sigma.alpha[1,1]
   sigma.randomSlope = sigma.alpha[2,2]
@@ -1187,17 +1193,16 @@ updateCovarianceParameters.binary <- function(numSubjects, firstObsPerSubject,
 #' add(1, 1)
 #' add(10, 1)
 #' 
-updateCovarianceParameters.gaussian <- function(totalObservations, numSubjects, 
+updateCovarianceParameters.gaussian <- function(model.options, totalObservations, numSubjects, 
                                                 firstObsPerSubject,
                                                 outcomes, covariates, X, Theta, 
                                                 Z, alpha, betaCovariates,
-                                                sigma.error,
-                                                prior.options) {
+                                                sigma.error) {
   
   # sample from an inverse wishart to update the covariance of the random effects
   perSubjectAlpha = alpha[firstObsPerSubject,]
-  sigma.alpha <- riwish(prior.options$sigmaError.df + numSubjects, 
-                        prior.options$sigmaError.scaleMatrix + crossprod(as.matrix(perSubjectAlpha)))
+  sigma.alpha <- riwish(model.options$sigmaError.df + numSubjects, 
+                        model.options$sigmaError.scaleMatrix + crossprod(as.matrix(perSubjectAlpha)))
   
   sigma.randomIntercept = sigma.alpha[1,1]
   sigma.randomSlope = sigma.alpha[2,2]
@@ -1218,8 +1223,8 @@ updateCovarianceParameters.gaussian <- function(totalObservations, numSubjects,
   residuals = residuals[,outcomes.var]
   
   # sample from an inverse Gamma to update sigma.error
-  shape <- prior.options$shape.tau + (totalObservations / 2) 
-  rate <- prior.options$rate.tau + (crossprod(residuals) / 2)
+  shape <- model.options$shape.tau + (totalObservations / 2) 
+  rate <- model.options$rate.tau + (crossprod(residuals) / 2)
   sigma.error <- 1 / rgamma(1, shape, rate)
   
   return (list(sigma.error = sigma.error,
@@ -1589,25 +1594,15 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     # update fixed effects associated with covariates
     if (!is.null(covariates)) {
       if (dist == "gaussian") {
-        result = updateFixedEffectsCovariates.gaussian(dist=dist, 
-                                                       outcomes=outcomes, 
-                                                       covariates=covariates, 
-                                                       X=X, 
-                                                       Theta=model.current$Theta, 
-                                                       Z=Z, alpha=alpha, 
-                                                       betaCovariates.previous=model.current$betaCovariates,  
-                                                       sigma.error=model.current$sigma.error, 
-                                                       sigma.beta=prior.options$sigma.beta)
+        result = updateFixedEffectsCovariates.gaussian(model.options, outcomes, covariates, 
+                                                       X, model.current$Theta, 
+                                                       Z, alpha, model.current$betaCovariates,
+                                                       model.current$sigma.error)
       } else {
-        result = updateFixedEffectsCovariates.binary(dist=dist, 
-                                                     outcomes=outcomes, 
-                                                     covariates=covariates, 
-                                                     X=X, 
-                                                     Theta=model.current$Theta, 
-                                                     Z=Z, alpha=alpha, 
-                                                     betaCovariates.previous=model.current$betaCovariates,  
-                                                     sigma.error=model.current$sigma.error, 
-                                                     sigma.beta=prior.options$sigma.beta)
+        # binary outcome
+        result = updateFixedEffectsCovariates.binary(model.options, outcomes, covariates, 
+                                                     X, model.current$Theta, 
+                                                     Z, alpha, model.current$betaCovariates)
       }
       model.current$betaCovariates = result$betaCovariates
       model.current$proposed$fixedEffectsCovariates = TRUE
@@ -1617,65 +1612,37 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     # update random effects
     if (dist == "gaussian") {
       alpha = 
-        updateRandomEffects.gaussian(dist=dist, 
-                                     numSubjects=numSubjects, 
-                                     numObservations=numObservations, 
-                                     firstObsPerSubject=firstObsPerSubject,
-                                     subjectsPerGroup=subjectsPerGroup,
-                                     ids=data[,ids.var], outcomes=outcomes, 
-                                     times.observation=data[,times.observation.var],
-                                     covariates=covariates, 
-                                     X=X, Theta=model.current$Theta, 
-                                     Z=Z, alpha=alpha, 
-                                     betaCovariates=model.current$betaCovariates,
-                                     sigma.randomIntercept=model.current$sigma.randomIntercept, 
-                                     sigma.randomSlope=model.current$sigma.randomSlope,
-                                     sigma.randomInterceptSlope=model.current$sigma.randomInterceptSlope,
-                                     sigma.error=model.current$sigma.error)
+        updateRandomEffects.gaussian(numSubjects, numObservations, firstObsPerSubject,
+                                     subjectsPerGroup, data[,ids.var], outcomes, 
+                                     data[,times.observation.var], covariates, 
+                                     X, model.current$Theta, Z, alpha, 
+                                     model.current$betaCovariates,
+                                     model.current$sigma.randomIntercept, 
+                                     model.current$sigma.randomSlope,
+                                     model.current$sigma.randomInterceptSlope,
+                                     model.current$sigma.error)
     } else {
       alpha = 
-        updateRandomEffects.binary(dist=dist, 
-                                   numSubjects=numSubjects, 
-                                   numObservations=numObservations, 
-                                   firstObsPerSubject=firstObsPerSubject,
-                                   subjectsPerGroup=subjectsPerGroup,
-                                   ids=data[,ids.var], outcomes=outcomes, 
-                                   times.observation=data[,times.observation.var],
-                                   covariates=covariates, 
-                                   X=X, Theta=model.current$Theta, 
-                                   Z=Z, alpha=alpha, 
-                                   betaCovariates=model.current$betaCovariates,
-                                   sigma.randomIntercept=model.current$sigma.randomIntercept, 
-                                   sigma.randomSlope=model.current$sigma.randomSlope,
-                                   sigma.randomInterceptSlope=model.current$sigma.randomInterceptSlope,
-                                   sigma.error=model.current$sigma.error)
+        updateRandomEffects.binary(numSubjects, numObservations, firstObsPerSubject,
+                                   subjectsPerGroup, data[,ids.var], outcomes, 
+                                   data[,times.observation.var], covariates, 
+                                   X, model.current$Theta, Z, alpha, 
+                                   model.current$betaCovariates,
+                                   model.current$sigma.randomIntercept, 
+                                   model.current$sigma.randomSlope,
+                                   model.current$sigma.randomInterceptSlope)
     }
     
     # update variance components
     if (dist == "gaussian") {
-      result = updateCovarianceParameters.gaussian(dist=dist,
-                                                   totalObservations=nrow(data), 
-                                                   numSubjects=numSubjects,
-                                                   firstObsPerSubject=firstObsPerSubject,
-                                                   outcomes=outcomes, 
-                                                   covariates=covariates,
-                                                   X=X, Theta=model.current$Theta,
-                                                   Z=Z, alpha=alpha,
-                                                   betaCovariates=model.current$betaCovariates,
-                                                   sigma.error=sigma.error,
-                                                   prior.options=prior.options)
+      result = updateCovarianceParameters.gaussian(model.options, nrow(data), 
+                                                   numSubjects, firstObsPerSubject,
+                                                   outcomes, covariates, X, model.current$Theta,
+                                                   Z, alpha, model.current$betaCovariates,
+                                                   sigma.error)
     } else {
-      result = updateCovarianceParameters.binary(dist=dist,
-                                                 totalObservations=nrow(data), 
-                                                 numSubjects=numSubjects,
-                                                 firstObsPerSubject=firstObsPerSubject,
-                                                 outcomes=outcomes, 
-                                                 covariates=covariates,
-                                                 X=X, Theta=model.current$Theta,
-                                                 Z=Z, alpha=alpha,
-                                                 betaCovariates=model.current$betaCovariates,
-                                                 sigma.error=sigma.error,
-                                                 prior.options=prior.options)
+      result = updateCovarianceParameters.binary(model.options, numSubjects, firstObsPerSubject,
+                                                 outcomes, alpha)
     }
     model.current$sigma.error = result$sigma.error
     model.current$sigma.randomIntercept = result$sigma.randomIntercept

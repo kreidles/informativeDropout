@@ -71,8 +71,7 @@ informativeDropout <- function(data, ids.var, outcomes.var, groups.var, covariat
   if (method == 'bayes.splines') {
     # model the relationship between dropout time and slope using natural splines
     return (informativeDropout.bayes.splines(data, ids.var, outcomes.var, groups.var, covariates.var, 
-                                             times.dropout.var, times.observation.var, dist, 
-                                             model.options))
+                                             times.dropout.var, times.observation.var, dist, model.options))
     
   } else if (method == 'dirichlet') {
     # account for informative dropout using a dirichlet process 

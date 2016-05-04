@@ -382,6 +382,19 @@ test.example <- function() {
   prior.options=list(shape.tau = 0.001, rate.tau = 0.001, lambda.numKnots = 1,
                      sigma.beta = 1, sigmaError.df = 3, sigmaError.scaleMatrix = diag(2))
   
+  model.options <- bayes.splines.model.options(iterations=100, burnin=10, thin=NA,
+                                         knots.prob.birth=0.5, knots.min=3, knots.max=10, knots.setpSize=3,
+                                         knots.positions.start=c(330,550,1060), 
+                                         knots.positions.candidate=seq(10,max(data$day),10),
+                                         dropout.estimationTimes=c(1,2,3),
+                                         shape.tau=0.001, rate.tau=0.001,
+                                         sigma.beta=1, lambda.numKnots=1,
+                                         sigma.error=1,
+                                         sigma.error.df = 3,
+                                         sigma.error.scale = diag(2),
+                                         eta.null=NULL)
+  
+  
   set.seed(1066)
   result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
                               times.dropout.var, times.observation.var, 
@@ -407,23 +420,25 @@ test.sim <- function() {
   times.observation.var = "t"
   method="bayes.splines"
   dist = "gaussian"
-  knots.options=list(birthProbability=0.2, min=1, max=10, stepSize=0.1,
-                     startPositions=c(0,7/30,0.5, 23/30,1), candidatePositions=seq(0,1,0.1/3)) 
-  mcmc.options=list(iterations=40000, burnIn=10, sigma.residual=1.25^2)
-  prior.options=list(shape.tau = 0.001, rate.tau = 0.001, lambda.numKnots = 5,
-                     sigma.beta = 25, sigmaError.df = 3, 
-                     sigmaError.scaleMatrix = diag(2))
-  start.options=list()
-  dropoutEstimationTimes = seq(0,1,1/15)
+  
+  model.options <- bayes.splines.model.options(iterations=100, burnin=10, thin=NA,
+                                               knots.prob.birth=0.2, knots.min=1, knots.max=10, 
+                                               knots.stepSize=0.1,
+                                               knots.positions.start=c(0,7/30,0.5, 23/30,1), 
+                                               knots.positions.candidate=seq(0,1,0.1/3),
+                                               dropout.estimationTimes=seq(0,1,1/15),
+                                               shape.tau=0.001, rate.tau=0.001,
+                                               sigma.beta=25, lambda.numKnots=5,
+                                               sigma.error=1,
+                                               sigma.error.df = 3,
+                                               sigma.error.scale = diag(2),
+                                               eta.null=NULL)
+  
   
   set.seed(1066)
   result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
                               times.dropout.var, times.observation.var, 
-                              method, dist,
-                              knots.options = knots.options, 
-                              mcmc.options = mcmc.options,
-                              prior.options = prior.options,
-                              dropoutEstimationTimes = dropoutEstimationTimes)
+                              method, dist, model.options)
   
   
   acceptanceProbability(result, "knot.add")
