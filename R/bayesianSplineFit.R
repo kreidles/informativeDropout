@@ -202,7 +202,7 @@ addKnot.binary <- function(model.options, knots.previous, outcomes,
   eta.null <- model.options$eta.null
   
   # add a knot by randomly selecting a candidate knot
-  candidatesPositions = model.options$candidatePositions[! model.options$candidatePositions %in% knots.previous]
+  candidatesPositions = model.options$knots.positions.candidate[! model.options$knots.positions.candidate %in% knots.previous]
   newKnot.value = sample(candidatesPositions, 1)
   knots.star <- sort(c(knots.previous, newKnot.value))
   # get the interior and boundary knots, and grab the position of the knot that
@@ -246,8 +246,8 @@ addKnot.binary <- function(model.options, knots.previous, outcomes,
   }
   
   # Calculate birth and death probabilities                                                        
-  probBirth <- ifelse(length(knots.previous) == model.options$min, 1, model.options$knots.prob.birth)
-  probDeath <- ifelse(length(knots.previous) == model.options$max - 1, 1, 1 - model.options$knots.prob.birth)
+  probBirth <- ifelse(length(knots.previous) == model.options$knots.min, 1, model.options$knots.prob.birth)
+  probDeath <- ifelse(length(knots.previous) == model.options$knots.max - 1, 1, 1 - model.options$knots.prob.birth)
   
   # calculate the previous eta and associated probability
   eta.previous = as.vector(X.previous %*% Theta.previous + cBeta + zAlpha)
@@ -307,7 +307,7 @@ addKnot.gaussian <- function(model.options, knots.previous, outcomes,
   lambda.numKnots <- model.options$lambda.numKnots
   
   # add a knot by randomly selecting a candidate knot
-  candidatePositions = model.options$candidatePositions[!(model.options$candidatePositions %in% knots.previous)]
+  candidatePositions = model.options$knots.positions.candidate[!(model.options$knots.positions.candidate %in% knots.previous)]
   newKnot.value = sample(candidatePositions, 1)
   knots.star <- sort(c(knots.previous, newKnot.value))
   # get the interior and boundary knots, and grab the position of the knot that
@@ -356,8 +356,8 @@ addKnot.gaussian <- function(model.options, knots.previous, outcomes,
   }
   
   # Calculate birth and death probabilities                                                        
-  probBirth <- ifelse(length(knots.previous) == model.options$min, 1, model.options$knots.prob.birth)
-  probDeath <- ifelse(length(knots.previous) == model.options$max - 1, 1, 1 - model.options$knots.prob.birth)
+  probBirth <- ifelse(length(knots.previous) == model.options$knots.min, 1, model.options$knots.prob.birth)
+  probDeath <- ifelse(length(knots.previous) == model.options$knots.max - 1, 1, 1 - model.options$knots.prob.birth)
   
   # Calculate residuals for likelihood ratio
   if (!is.null(covariates)) {
@@ -462,9 +462,9 @@ removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dro
   loglikelihood.star <- sum(log((1 - prob.star[outcomes==0]))) + sum(log(prob.star[outcomes==1]))    
   
   # Calculate birth and death probabilities                                                        
-  probBirth <- ifelse(length(knots.star) == model.options$min, 
+  probBirth <- ifelse(length(knots.star) == model.options$knots.min, 
                       1, model.options$knots.prob.birth)
-  probDeath <- ifelse(length(knots.previous) == model.options$max, 
+  probDeath <- ifelse(length(knots.previous) == model.options$knots.max, 
                       1, 1 - model.options$knots.prob.birth)
   
   #Calculate Acceptance Probability  
@@ -555,9 +555,9 @@ removeKnot.gaussian <- function(model.options, knots.previous,
   }
   
   # Calculate birth and death probabilities                                                        
-  probBirth <- ifelse(length(knots.star) == model.options$min, 
+  probBirth <- ifelse(length(knots.star) == model.options$knots.min, 
                       1, model.options$knots.prob.birth)
-  probDeath <- ifelse(length(knots.previous) == model.options$max, 
+  probDeath <- ifelse(length(knots.previous) == model.options$knots.max, 
                       1, 1 - model.options$knots.prob.birth)
   
   #Calculate Acceptance Probability                                                        
@@ -601,9 +601,9 @@ moveKnot.binary <- function(model.options, knots.previous,
   lambda.numKnots <- model.options$lambda.numKnots
   eta.null <- model.options$eta.null
   # candidate positions
-  potentialLocations = model.options$candidatePositions[! model.options$candidatePositions %in% knots.previous]
+  potentialLocations = model.options$knots.positions.candidate[! model.options$knots.positions.candidate %in% knots.previous]
   # step size for moving a knot
-  knots.stepSize = model.options$knots.setSize
+  knots.stepSize = model.options$knots.stepSize
   
   #Pick a knot to move 
   knotToMove <- sample(knots.previous, 1) 
@@ -693,9 +693,9 @@ moveKnot.gaussian <- function(model.options, knots.previous,
   sigma.beta <- model.options$sigma.beta
   lambda.numKnots <- model.options$lambda.numKnots
   # candidate positions
-  potentialLocations = model.options$candidatePositions[! model.options$candidatePositions %in% knots.previous]
+  potentialLocations = model.options$knots.positions.candidate[! model.options$knots.positions.candidate %in% knots.previous]
   # step size for moving a knot
-  knots.stepSize = model.options$knots.setSize
+  knots.stepSize = model.options$knots.stepSize
   
   #Pick a knot to move 
   knotToMove <- sample(knots.previous, 1) 
@@ -877,8 +877,8 @@ updateFixedEffects.gaussian <- function(model.options, knots.previous,
   proposedMean <- proposedCovariance %*% ((1/sigma.error) * crossprod(X.previous, LRresid))
   
   # Scale Cov to adjust acceptance rate
-  adjust = ifelse(!is.null(mcmc.options$fixedEffectAcceptRateAdjust), 
-                  mcmc.options$fixedEffectAcceptRateAdjust, 1)
+  adjust = ifelse(!is.null(model.options$fixedEffectAcceptRateAdjust), 
+                  model.options$fixedEffectAcceptRateAdjust, 1)
   proposedCovariance <- adjust * proposedCovariance 
   
   # ensure the covariance is positive definite
@@ -1006,8 +1006,8 @@ updateFixedEffectsCovariates.gaussian <- function(model.options, outcomes, covar
   
   # Scale Cov to adjust acceptance rate
   proposedCovariance <- proposedCovariance * 
-    ifelse(!is.null(mcmc.options$fixedEffectAcceptRateAdjust), 
-           mcmc.options$fixedEffectAcceptRateAdjust, 1)
+    ifelse(!is.null(model.options$fixedEffectAcceptRateAdjust), 
+           model.options$fixedEffectAcceptRateAdjust, 1)
   
   # ensure the covariance is positive definite
   proposedCovariance <- as.matrix(nearPD(proposedCovariance)$mat) 
@@ -1367,13 +1367,14 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   # create some reasonable defaults for the start positions and candidate positions
   # if not specified
   if (is.null(model.options$startPositions) || is.null(model.options$candidatePositions)) {
-    dropout.min = min(data[,times.dropout])
-    dropout.max = max(data[,times.dropout])
-    if (is.null(model.options$candidatePositions)) {
-      model.options$candidatePositions = seq(dropout.min, dropout.max, 1)
+    dropout.min = min(data[,times.dropout.var])
+    dropout.max = max(data[,times.dropout.var])
+    if (is.null(model.options$knots.positions.candidate)) {
+      model.options$knots.positions.candidate = seq(dropout.min, dropout.max, 1)
     }
-    if (is.null(model.options$startPositions)) {
-      model.options$startPositions = sample(model.options$candidatePositions, model.options$min)
+    if (is.null(model.options$knots.positions.start)) {
+      model.options$knots.positions.start = sample(model.options$knots.positions.candidate, 
+                                                   model.options$knots.min)
     }
   }
   
@@ -1415,8 +1416,8 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   X = lapply(groupList, function(group) { 
     groupTimes = data[data[,groups.var] == group,times.observation.var]
     groupDropout = data[data[,groups.var] == group,times.dropout.var]
-    knots.boundary = range(model.options$startPositions)
-    knots.interior = model.options$startPositions[-c(1,length(model.options$startPositions))] 
+    knots.boundary = range(model.options$knots.positions.start)
+    knots.interior = model.options$knots.positions.start[-c(1,length(model.options$knots.positions.start))] 
     return(as.matrix(cbind(
       rep(1,length(groupTimes)),
       ns(groupDropout, knots=knots.interior, Boundary.knots=knots.boundary, intercept=T) * groupTimes
@@ -1457,23 +1458,24 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   
   # initialize the first model iteration
   # TODO: mcmc options specify starting values
-  modelIterationList <- vector(mode = "list", length = mcmc.options$iterations)
+  modelIterationList <- vector(mode = "list", length = model.options$iterations)
   modelIterationList[[1]] = 
-    rjmcmc.iteration(
-      knots=lapply(1:length(groupList), function(i) { return (model.options$startPositions); }), 
-      Theta=Theta.init, betaCovariate=betaCovariate.init,
+    bayes.splines.iteration(
+      knots=lapply(1:length(groupList), function(i) { return (model.options$knots.positions.start); }), 
+      Theta=Theta.init, betas.covariates=betaCovariate.init,
       sigma.error = lapply(1:length(groupList), function(i) { return (model.options$sigma.error); }),
       sigma.spline = lapply(1:length(groupList), function(i) { return (model.options$sigma.spline); }),
       sigma.randomIntercept = lapply(1:length(groupList), function(i) { return (model.options$sigma.randomIntercept); }),
       sigma.randomSlope = lapply(1:length(groupList), function(i) { return (model.options$sigma.randomSlope); }),
       sigma.randomInterceptSlope = lapply(1:length(groupList), function(i) { return (model.options$sigma.randomInterceptSlope); }),
-      shape.tau = lapply(1:length(groupList), function(i) { return (model.options$shape.tau); }),
-      rate.tau = lapply(1:length(groupList), function(i) { return (model.options$rate.tau); })
+      sigma.error.shape = lapply(1:length(groupList), function(i) { return (model.options$sigma.error.shape); }),
+      sigma.error.rate = lapply(1:length(groupList), function(i) { return (model.options$sigma.error.rate); })
     )
+  
   #
   # Run the reversible jump MCMC
   #
-  for (i in 2:mcmc.options$iterations) {
+  for (i in 2:model.options$iterations) {
     print(paste("ITER = ", i, sep=""))
     
     model.previous = modelIterationList[[i-1]]
@@ -1501,9 +1503,9 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       
       # randomly decide to add/remove a knot
       u = runif(1)
-      if ((u < model.options$birthProbability && 
-           length(model.current$knots[[group.index]]) < model.options$max) || 
-          (length(model.current$knots[[group.index]]) <= model.options$min)) {
+      if ((u < model.options$knots.prob.birth && 
+           length(model.current$knots[[group.index]]) < model.options$knots.max) || 
+          (length(model.current$knots[[group.index]]) <= model.options$knots.min)) {
         if (dist == "gaussian") {
           # add a knot
           result = addKnot.gaussian(model.options, model.current$knots[[group.index]], 

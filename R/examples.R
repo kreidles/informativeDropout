@@ -435,7 +435,7 @@ test.sim <- function() {
                                                eta.null=NULL)
   
   
-  set.seed(1066)
+  set.seed(1066) 
   result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
                               times.dropout.var, times.observation.var, 
                               method, dist, model.options)
