@@ -10,7 +10,7 @@
 #' @param knots list of knot positions by group
 #' @param Theta list of spline coefficients by group
 #' @param betas.covariates regression coefficients related to covariates
-#' @param sigma.spline covariance of the spline coefficients
+#' @param sigma.residual covariance of the spline coefficients
 #' @param sigma.randomIntercept variance of the random intercepts
 #' @param sigma.randomSlope variance of the random slopes
 #' @param sigma.randomInterceptSlope covariance of the random intercepts and slopes
@@ -26,7 +26,7 @@
 #' @exportClass bayes.splines.iteration
 #'
 bayes.splines.iteration <- function(knots=NULL, Theta=NULL, betas.covariates=NULL,
-                                    sigma.spline = 1,
+                                    sigma.residual = 1,
                                     sigma.randomIntercept = 1,
                                     sigma.randomSlope = 1, sigma.randomInterceptSlope = 0,
                                     sigma.error = 1, 
@@ -51,8 +51,8 @@ bayes.splines.iteration <- function(knots=NULL, Theta=NULL, betas.covariates=NUL
     # (includes group offsets)
     betas.covariates = betas.covariates,
     
-    # variance of spline coefficients
-    sigma.spline = sigma.spline,
+    # variance of residuals
+    sigma.residual = sigma.residual,
     # variance / covariance of the random effects
     sigma.randomIntercept = sigma.randomIntercept,
     sigma.randomSlope = sigma.randomSlope,
@@ -94,13 +94,17 @@ bayes.splines.iteration <- function(knots=NULL, Theta=NULL, betas.covariates=NUL
 bayes.splines.model.options = function(iterations=10000, burnin=500, thin=NA,
                                        knots.prob.birth=0.5, knots.min=1, knots.max=NA, knots.stepSize=3,
                                        knots.positions.start=NULL, knots.positions.candidate=NULL,
-                                       prob.min=0.00001, prob.max=0.99999,
+                                       prob.min=0.00001, prob.max=0.99999, accept.rate.adjust=1,
                                        dropout.estimationTimes=NULL,
-                                       shape.tau=NULL, rate.tau=NULL,
-                                       sigma.beta=NULL, lambda.numKnots=NULL,
+                                       sigma.beta=NULL, sigma.residual=NULL,
                                        sigma.error=0,
-                                       sigma.error.df = NULL,
-                                       sigma.error.scale = NULL,
+                                       sigma.error.shape.tau=NULL, sigma.error.rate.tau=NULL,
+                                       lambda.numKnots=NULL,
+                                       sigma.randomIntercept = NULL,
+                                       sigma.randomSlope = NULL,
+                                       sigma.randomInterceptSlope = NULL,
+                                       sigma.randomEffects.df = NULL,
+                                       sigma.randomEffects.scale = NULL,
                                        eta.null=NULL) {
   # TODO: add na.rm to ignore subjects with missing outcomes or covariates
   # validate the mcmc options
@@ -127,18 +131,18 @@ bayes.splines.model.options = function(iterations=10000, burnin=500, thin=NA,
   
   
   # validate the prior options
-  if (is.na(shape.tau) || is.null(shape.tau) || shape.tau <= 0) {
+  if (is.na(sigma.error.shape.tau) || is.null(sigma.error.shape.tau) || sigma.error.shape.tau <= 0) {
     stop("Prior options error :: shape.tau must be greater than 0")
   }
-  if (is.na(rate.tau) || is.null(rate.tau) || rate.tau <= 0) {
+  if (is.na(sigma.error.rate.tau) || is.null(sigma.error.rate.tau) || sigma.error.rate.tau <= 0) {
     stop("Prior options error :: rate.tau must be greater than 0")
   }
-  if (is.na(sigma.error.df) || is.null(sigma.error.df) || sigma.error.df <= 0) {
+  if (is.na(sigma.randomEffects.df) || is.null(sigma.randomEffects.df) || sigma.randomEffects.df <= 0) {
     stop("Prior options error :: sigmaError.df must be greater than 0")
   }
-  if (is.null(sigma.error.scale) || 
-      !is.positive.definite(sigma.error.scale)) {
-    stop("Prior options error :: sigma.error.scale must be a positive definite matrix")
+  if (is.null(sigma.randomEffects.scale) || 
+      !is.positive.definite(sigma.randomEffects.scale)) {
+    stop("Prior options error :: sigma.randomEffects.scale must be a positive definite matrix")
   }
   
   opts = list(
@@ -162,18 +166,34 @@ bayes.splines.model.options = function(iterations=10000, burnin=500, thin=NA,
     knots.positions.candidate = knots.positions.candidate,
     # minimum/maximum probability for Metropolis Hastings for binary outcomes
     # these control numeric instability with taking logs
-    prob.min <- prob.min,
-    prob.max <- prob.max,
-    
+    prob.min = prob.min,
+    prob.max = prob.max,
+    # acceptance rate adjustment
+    accept.rate.adjust = accept.rate.adjust,
     # times at which the dropout time dependent slopes will be estimated
     dropout.estimationTimes = dropout.estimationTimes,
     
-    # hyperparameters for the shape parameter
-    shape.tau = shape.tau, 
-    #
-    rate.tau = rate.tau,
-    sigma.error.df = sigma.error.df,
-    sigma.error.scale = sigma.error.scale
+    # covariance of regression coefficients associated with fixed effects
+    sigma.beta = sigma.beta,
+    # covariance of residuals
+    sigma.residual = sigma.residual,
+    # for gaussian outcomes, the residual error starting value
+    sigma.error = sigma.error,
+    # hyperpriors for inverse gamma distribution of sigma.error
+    sigma.error.shape.tau = sigma.error.shape.tau, 
+    sigma.error.rate.tau = sigma.error.rate.tau,
+    # prior for the poisson distribution of the number of knots
+    lambda.numKnots = lambda.numKnots,
+    # starting values for random effects covariance parameters
+    sigma.randomIntercept = sigma.randomIntercept,
+    sigma.randomSlope = sigma.randomSlope,
+    sigma.randomInterceptSlope = sigma.randomInterceptSlope,
+    # priors for the inverse wishart distribution of the covariance of random effects
+    sigma.randomEffects.df = sigma.randomEffects.df,
+    sigma.randomEffects.scale = sigma.randomEffects.scale,
+    # for binary outcomes, eta null
+    eta.null = eta.null
+    
   )
   
   class(opts) <- append(class(opts), "bayes.splines.model.options")
@@ -225,9 +245,9 @@ addKnot.binary <- function(model.options, knots.previous, outcomes,
   zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
   
   # calculate residuals
-  eta.wls <- eta0 + zAlpha + ifelse(!is.null(covariates), cBeta, 0)
-  Theta.LSXprev <- wls(y, X, eta.wls, model.options)
-  Theta.LSXstar <- wls(y, X, eta.wls, model.options)
+  eta.wls <- eta.null + zAlpha + ifelse(!is.null(covariates), cBeta, 0)
+  Theta.LSXprev <- wls.binary(y, X.previous, eta.wls, model.options)
+  Theta.LSXstar <- wls.binary(y, X.star, eta.wls, model.options)
   Theta.LSresid <- Theta.previous - Theta.LSXprev
   
   #Draw a residual for the added coefficient and calculate coefficient transformation
@@ -250,7 +270,7 @@ addKnot.binary <- function(model.options, knots.previous, outcomes,
   probDeath <- ifelse(length(knots.previous) == model.options$knots.max - 1, 1, 1 - model.options$knots.prob.birth)
   
   # calculate the previous eta and associated probability
-  eta.previous = as.vector(X.previous %*% Theta.previous + cBeta + zAlpha)
+  eta.previous = as.vector(X.previous %*% Theta.previous + zAlpha + ifelse(!is.null(covariates), cBeta, 0))
   prob.previous = inv.logit(eta.previous)
   # adjust probabilities within tolerance levels
   prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
@@ -259,7 +279,7 @@ addKnot.binary <- function(model.options, knots.previous, outcomes,
   
   
   # calculate the proposal eta and associated probability
-  eta.star = as.vector(X.star %*% Theta.star + cBeta + zAlpha)
+  eta.star = as.vector(X.star %*% Theta.star + zAlpha + ifelse(!is.null(covariates), cBeta, 0))
   prob.star = inv.logit(eta.star)
   # adjust probabilities within tolerance levels
   prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
@@ -298,8 +318,7 @@ addKnot.binary <- function(model.options, knots.previous, outcomes,
 addKnot.gaussian <- function(model.options, knots.previous, outcomes, 
                              times.dropout, times.observation, 
                              covariates, X.previous, Theta.previous,
-                             Z, alpha, betaCovariates, 
-                             sigma.beta, sigma.residual, sigma.error, lambda.numKnots) {
+                             Z, alpha, betaCovariates, sigma.error) {
   
   # get the relevant priors from the model options
   sigma.residual <- model.options$sigma.residual
@@ -435,9 +454,9 @@ removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dro
   } 
   
   # calculate residuals
-  eta.wls <- eta0 + zAlpha + ifelse(!is.null(covariates), cBeta, 0)
-  Theta.LSXprev <- wls(y, X, eta.wls, model.options)
-  Theta.LSXstar <- wls(y, X, eta.wls, model.options)
+  eta.wls <- eta.null + zAlpha + ifelse(!is.null(covariates), cBeta, 0)
+  Theta.LSXprev <- wls.binary(y, X.previous, eta.wls, model.options)
+  Theta.LSXstar <- wls.binary(y, X.star, eta.wls, model.options)
   Theta.LSresid <- Theta.previous - Theta.LSXprev
   
   # update the coefficients
@@ -446,7 +465,7 @@ removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dro
   
   
   # calculate the previous eta and associated probability
-  eta.previous = as.vector(X.previous %*% Theta.previous + cBeta + zAlpha)
+  eta.previous = as.vector(X.previous %*% Theta.previous + ifelse(!is.null(covariates), cBeta, 0) + zAlpha)
   prob.previous = inv.logit(eta.previous)
   # adjust probabilities within tolerance levels
   prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
@@ -454,7 +473,7 @@ removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dro
   loglikelihood.previous <- sum(log((1 - prob.previous[outcomes==0]))) + sum(log(prob.previous[outcomes==1]))    
   
   # calculate the proposal eta and associated probability
-  eta.star = as.vector(X.star %*% Theta.star + cBeta + zAlpha)
+  eta.star = as.vector(X.star %*% Theta.star + ifelse(!is.null(covariates), cBeta, 0) + zAlpha)
   prob.star = inv.logit(eta.star)
   # adjust probabilities within tolerance levels
   prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
@@ -506,7 +525,7 @@ removeKnot.gaussian <- function(model.options, knots.previous,
   sigma.residual <- model.options$sigma.residual
   sigma.beta <- model.options$sigma.beta
   lambda.numKnots <- model.options$lambda.numKnots
-  
+
   # randomly remove an existing knot
   index = sample(1:length(knots.previous), 1)
   knots.star <- knots.previous[-index]
@@ -644,7 +663,7 @@ moveKnot.binary <- function(model.options, knots.previous,
     zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
     
     # calculate the previous eta and associated probability
-    eta.previous = as.vector(X.previous %*% Theta.previous + cBeta + zAlpha)
+    eta.previous = as.vector(X.previous %*% Theta.previous + ifelse(!is.null(covariates), cBeta, 0) + zAlpha)
     prob.previous = inv.logit(eta.previous)
     # adjust probabilities within tolerance levels
     prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
@@ -652,7 +671,7 @@ moveKnot.binary <- function(model.options, knots.previous,
     loglikelihood.previous <- sum(log((1 - prob.previous[outcomes==0]))) + sum(log(prob.previous[outcomes==1]))    
     
     # calculate the proposal eta and associated probability
-    eta.star = as.vector(X.star %*% Theta.star + cBeta + zAlpha)
+    eta.star = as.vector(X.star %*% Theta.previous + ifelse(!is.null(covariates), cBeta, 0) + zAlpha)
     prob.star = inv.logit(eta.star)
     # adjust probabilities within tolerance levels
     prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
@@ -821,7 +840,7 @@ updateFixedEffects.binary <- function(model.options, knots.previous,
   y.star <- XTheta.star + (y - prob.star) * (1 / (prob.star * (1 - prob.star)))
   weight.star <- Diagonal(x=prob.star * (1 - prob.star))
   covar.star <- as.matrix(nearPD(solve(covarIntThetaInverse + crossprod(X.previous, weight.star %*% X.previous)))$mat)
-  mu.star <- covar.star %*% (crossprod(Xt,weightstar%*%ystar))
+  mu.star <- covar.star %*% (crossprod(XTheta.star, weight.star %*% y.star))
   
   # Metropolis hastings step
   rho <- (loglikelihood.star - loglikelihood.previous + 
@@ -877,8 +896,8 @@ updateFixedEffects.gaussian <- function(model.options, knots.previous,
   proposedMean <- proposedCovariance %*% ((1/sigma.error) * crossprod(X.previous, LRresid))
   
   # Scale Cov to adjust acceptance rate
-  adjust = ifelse(!is.null(model.options$fixedEffectAcceptRateAdjust), 
-                  model.options$fixedEffectAcceptRateAdjust, 1)
+  adjust = ifelse(!is.null(model.options$accept.rate.adjust), 
+                  model.options$accept.rate.adjust, 1)
   proposedCovariance <- adjust * proposedCovariance 
   
   # ensure the covariance is positive definite
@@ -1006,8 +1025,8 @@ updateFixedEffectsCovariates.gaussian <- function(model.options, outcomes, covar
   
   # Scale Cov to adjust acceptance rate
   proposedCovariance <- proposedCovariance * 
-    ifelse(!is.null(model.options$fixedEffectAcceptRateAdjust), 
-           model.options$fixedEffectAcceptRateAdjust, 1)
+    ifelse(!is.null(model.options$accept.rate.adjust), 
+           model.options$accept.rate.adjust, 1)
   
   # ensure the covariance is positive definite
   proposedCovariance <- as.matrix(nearPD(proposedCovariance)$mat) 
@@ -1171,8 +1190,8 @@ updateCovarianceParameters.binary <- function(model.options, numSubjects,
   
   # sample from an inverse wishart to update the covariance of the random effects
   perSubjectAlpha = alpha[firstObsPerSubject,]
-  sigma.alpha <- riwish(model.options$sigmaError.df + numSubjects, 
-                        model.options$sigmaError.scaleMatrix + crossprod(as.matrix(perSubjectAlpha)))
+  sigma.alpha <- riwish(model.options$sigma.randomEffects.df + numSubjects, 
+                        model.options$sigma.randomEffects.scaleMatrix + crossprod(as.matrix(perSubjectAlpha)))
   
   sigma.randomIntercept = sigma.alpha[1,1]
   sigma.randomSlope = sigma.alpha[2,2]
@@ -1201,8 +1220,8 @@ updateCovarianceParameters.gaussian <- function(model.options, totalObservations
   
   # sample from an inverse wishart to update the covariance of the random effects
   perSubjectAlpha = alpha[firstObsPerSubject,]
-  sigma.alpha <- riwish(model.options$sigmaError.df + numSubjects, 
-                        model.options$sigmaError.scaleMatrix + crossprod(as.matrix(perSubjectAlpha)))
+  sigma.alpha <- riwish(model.options$sigma.randomEffects.df + numSubjects, 
+                        model.options$sigma.randomEffects.scale + crossprod(as.matrix(perSubjectAlpha)))
   
   sigma.randomIntercept = sigma.alpha[1,1]
   sigma.randomSlope = sigma.alpha[2,2]
@@ -1223,8 +1242,8 @@ updateCovarianceParameters.gaussian <- function(model.options, totalObservations
   residuals = residuals[,outcomes.var]
   
   # sample from an inverse Gamma to update sigma.error
-  shape <- model.options$shape.tau + (totalObservations / 2) 
-  rate <- model.options$rate.tau + (crossprod(residuals) / 2)
+  shape <- model.options$sigma.error.shape.tau + (totalObservations / 2) 
+  rate <- model.options$sigma.error.rate.tau + (crossprod(residuals) / 2)
   sigma.error <- 1 / rgamma(1, shape, rate)
   
   return (list(sigma.error = sigma.error,
@@ -1318,8 +1337,8 @@ getInitialEstimatesTheta <- function(dist, groupList, X, outcomes) {
       return (as.vector(coef(fit.Theta)))
     }))
   } else {
-    family = ifelse(dist == 'poisson', poisson(link = "log"), binomial(link = "logit"))
-    fit.Theta <- glm(formula, family=family, data=data.theta)
+    # binomial
+    fit.Theta <- glm(formula, family=binomial, data=data.theta)
     return (lapply(1:length(groupList), function(i) {
       return (as.vector(coef(fit.Theta)))
     }))
@@ -1366,7 +1385,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   
   # create some reasonable defaults for the start positions and candidate positions
   # if not specified
-  if (is.null(model.options$startPositions) || is.null(model.options$candidatePositions)) {
+  if (is.null(model.options$knots.positions.start) || is.null(model.options$knots.positions.candidate)) {
     dropout.min = min(data[,times.dropout.var])
     dropout.max = max(data[,times.dropout.var])
     if (is.null(model.options$knots.positions.candidate)) {
@@ -1463,13 +1482,13 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     bayes.splines.iteration(
       knots=lapply(1:length(groupList), function(i) { return (model.options$knots.positions.start); }), 
       Theta=Theta.init, betas.covariates=betaCovariate.init,
-      sigma.error = lapply(1:length(groupList), function(i) { return (model.options$sigma.error); }),
-      sigma.spline = lapply(1:length(groupList), function(i) { return (model.options$sigma.spline); }),
-      sigma.randomIntercept = lapply(1:length(groupList), function(i) { return (model.options$sigma.randomIntercept); }),
-      sigma.randomSlope = lapply(1:length(groupList), function(i) { return (model.options$sigma.randomSlope); }),
-      sigma.randomInterceptSlope = lapply(1:length(groupList), function(i) { return (model.options$sigma.randomInterceptSlope); }),
-      sigma.error.shape = lapply(1:length(groupList), function(i) { return (model.options$sigma.error.shape); }),
-      sigma.error.rate = lapply(1:length(groupList), function(i) { return (model.options$sigma.error.rate); })
+      sigma.error = model.options$sigma.error,
+      sigma.residual = model.options$sigma.residual,
+      sigma.randomIntercept = model.options$sigma.randomIntercept,
+      sigma.randomSlope = model.options$sigma.randomSlope,
+      sigma.randomInterceptSlope = model.options$sigma.randomInterceptSlope,
+      sigma.error.shape = model.options$sigma.error.shape.tau,
+      sigma.error.rate = model.options$sigma.error.rate.tau
     )
   
   #
@@ -1535,7 +1554,8 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
           result = removeKnot.gaussian(model.options, model.current$knots[[group.index]], 
                                        group.outcomes, group.times.dropout, group.times.observation, 
                                        group.covariates, X[[group.index]], model.current$Theta[[group.index]],
-                                       group.Z, group.alpha, model.current$betaCovariates, model.current$sigma.error)
+                                       group.Z, group.alpha, model.current$betaCovariates, 
+                                       model.current$sigma.error)
         } else {
           # remove a knot
           result = removeKnot.binary(model.options, model.current$knots[[group.index]], 
@@ -1551,8 +1571,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
         model.current$proposed$knot.remove = TRUE
         model.current$accepted$knot.remove = result$accepted
       }
-      print ("TOTAL KNOTS")
-      print (length(model.current$knots[[group.index]]))
+
       # Move knots
       if (dist == "gaussian") {
         result = moveKnot.gaussian(model.options, model.current$knots[[group.index]], 
@@ -1574,7 +1593,6 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       model.current$accepted$knot.move = result$accepted
       
       # update fixed effects (includes coefficients for covariates and time varying slopes)
-      print("FIXED")
       if (dist == "gaussian") {
         result = updateFixedEffects.gaussian(model.options, model.current$knots[[group.index]], 
                                              group.outcomes, group.times.dropout, group.times.observation, 
@@ -1610,7 +1628,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       model.current$proposed$fixedEffectsCovariates = TRUE
       model.current$accepted$fixedEffectsCovariates = result$accepted
     }
-    
+
     # update random effects
     if (dist == "gaussian") {
       alpha = 
@@ -1634,7 +1652,6 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                                    model.current$sigma.randomSlope,
                                    model.current$sigma.randomInterceptSlope)
     }
-    
     # update variance components
     if (dist == "gaussian") {
       result = updateCovarianceParameters.gaussian(model.options, nrow(data), 
@@ -1660,7 +1677,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     
     # calculate dropout time specific slopes
     result = calculateDropoutTimeSpecificSlope(
-      dropoutEstimationTimes=dropoutEstimationTimes, 
+      dropoutEstimationTimes=model.options$dropout.estimationTimes, 
       knotsByGroup = model.current$knots, 
       ThetaByGroup = model.current$Theta, 
       subjectsPerGroup=subjectsPerGroup,

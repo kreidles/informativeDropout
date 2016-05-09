@@ -5,10 +5,9 @@
 \title{Remove a knot and use a Metropolis-Hastings step
 to determine if we keep the changes to the model}
 \usage{
-removeKnot.gaussian(dist, knots.previous, model.options, outcomes,
-  times.dropout, times.observation, covariates, X.previous, Theta.previous, Z,
-  alpha, betaCovariates, sigma.residual, sigma.error, sigma.beta,
-  lambda.numKnots)
+removeKnot.gaussian(model.options, knots.previous, outcomes, times.dropout,
+  times.observation, covariates, X.previous, Theta.previous, Z, alpha,
+  betaCovariates, sigma.error)
 }
 \description{
 Remove a knot and use a Metropolis-Hastings step

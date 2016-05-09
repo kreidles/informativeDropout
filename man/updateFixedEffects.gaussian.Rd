@@ -5,9 +5,9 @@
 \title{Add a new knot and use a Metropolis-Hastings step
 to determine if we keep the changes to the model}
 \usage{
-updateFixedEffects.gaussian(dist, knots.previous, model.options, outcomes,
+updateFixedEffects.gaussian(model.options, knots.previous, outcomes,
   times.dropout, times.observation, covariates, X.previous, Theta.previous, Z,
-  alpha, betaCovariates, sigma.error, sigma.beta, lambda.numKnots)
+  alpha, betaCovariates, sigma.error)
 }
 \arguments{
 \item{x}{A number.}

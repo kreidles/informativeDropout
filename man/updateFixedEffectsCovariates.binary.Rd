@@ -5,8 +5,8 @@
 \title{Update the regression coefficients related to common
 covariates and group effects}
 \usage{
-updateFixedEffectsCovariates.binary(outcomes, covariates, X, Theta, Z, alpha,
-  betaCovariates.previous, sigma.error, sigma.beta)
+updateFixedEffectsCovariates.binary(model.options, outcomes, covariates, X,
+  Theta, Z, alpha, betaCovariates.previous)
 }
 \description{
 Update the regression coefficients related to common

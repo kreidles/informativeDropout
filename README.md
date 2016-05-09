@@ -20,16 +20,16 @@ perform the following steps:
 * Install R version 3.2.x or higher by following the instructions at http://www.r-project.org
 * From the R environment, install and load the "devtools" package
 ```R
-> install.packages("devtools")
-> library(devtools)
+install.packages("devtools")
+library(devtools)
 ```
 * Install the "informativeDropout" package directly from Github.com
 ```R
-> install_github(repo="informativeDropout", user="kreidles", ref="develop")
+install_github(repo="informativeDropout", user="kreidles", ref="develop")
 ```
 * Load the library
 ```R
-> library(informativeDropout)
+library(informativeDropout)
 ```
 
 ### Instructions for replicating results in "A Bayesian Natural Cubic B Spline Varying Coefficient Method for Non-Ignorable Dropout"

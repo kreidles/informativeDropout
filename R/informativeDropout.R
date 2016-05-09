@@ -80,7 +80,7 @@ informativeDropout <- function(data, ids.var, outcomes.var, groups.var, covariat
   } else if (method == 'mixed.splines') {
     # fit a mixed model which models the relationship between dropout time and slope using natural splines
     return (informativeDropout.mixed(data, ids.var, outcomes.var, groups.var, covariates.var, 
-                                     times.dropout.var, times.observation.var, dist, dist,
+                                     times.dropout.var, times.observation.var, dist, 
                                      model.options))
   }
   

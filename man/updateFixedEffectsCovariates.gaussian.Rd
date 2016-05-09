@@ -5,8 +5,8 @@
 \title{Update the regression coefficients related to common
 covariates and group effects}
 \usage{
-updateFixedEffectsCovariates.gaussian(outcomes, covariates, X, Theta, Z, alpha,
-  betaCovariates.previous, sigma.error, sigma.beta)
+updateFixedEffectsCovariates.gaussian(model.options, outcomes, covariates, X,
+  Theta, Z, alpha, betaCovariates.previous, sigma.error)
 }
 \description{
 Update the regression coefficients related to common

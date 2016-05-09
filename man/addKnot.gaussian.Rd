@@ -5,9 +5,9 @@
 \title{Add a new knot and use a Metropolis-Hastings step
 to determine if we keep the changes to the model}
 \usage{
-addKnot.gaussian(knots.previous, outcomes, times.dropout, times.observation,
-  covariates, X.previous, Theta.previous, Z, alpha, betaCovariates, sigma.beta,
-  sigma.residual, sigma.error, lambda.numKnots)
+addKnot.gaussian(model.options, knots.previous, outcomes, times.dropout,
+  times.observation, covariates, X.previous, Theta.previous, Z, alpha,
+  betaCovariates, sigma.beta, sigma.residual, sigma.error, lambda.numKnots)
 }
 \description{
 Add a new knot and use a Metropolis-Hastings step

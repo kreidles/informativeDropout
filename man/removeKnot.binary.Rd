@@ -5,10 +5,9 @@
 \title{Remove a knot and use a Metropolis-Hastings step
 to determine if we keep the changes to the model}
 \usage{
-removeKnot.binary(dist, knots.previous, outcomes, times.dropout,
+removeKnot.binary(model.options, knots.previous, outcomes, times.dropout,
   times.observation, covariates, X.previous, Theta.previous, Z, alpha,
-  betaCovariates, sigma.beta, sigma.residual, lambda.numKnots, eta.null,
-  model.options)
+  betaCovariates)
 }
 \description{
 Remove a knot and use a Metropolis-Hastings step

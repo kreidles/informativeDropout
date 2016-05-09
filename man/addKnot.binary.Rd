@@ -5,9 +5,9 @@
 \title{For binary outcomes, add a new knot and use a Metropolis-Hastings step
 to determine if we keep the changes to the model.}
 \usage{
-addKnot.binary(knots.previous, outcomes, times.dropout, times.observation,
-  covariates, X.previous, Theta.previous, Z, alpha, betaCovariates, sigma.beta,
-  sigma.residual, lambda.numKnots, eta.null, model.options)
+addKnot.binary(model.options, knots.previous, outcomes, times.dropout,
+  times.observation, covariates, X.previous, Theta.previous, Z, alpha,
+  betaCovariates)
 }
 \description{
 For binary outcomes, add a new knot and use a Metropolis-Hastings step

@@ -5,9 +5,9 @@
 \title{Add a new knot and use a Metropolis-Hastings step
 to determine if we keep the changes to the model}
 \usage{
-updateCovarianceParameters.gaussian(totalObservations, numSubjects,
-  firstObsPerSubject, outcomes, covariates, X, Theta, Z, alpha, betaCovariates,
-  sigma.error, prior.options)
+updateCovarianceParameters.gaussian(model.options, totalObservations,
+  numSubjects, firstObsPerSubject, outcomes, covariates, X, Theta, Z, alpha,
+  betaCovariates, sigma.error)
 }
 \arguments{
 \item{x}{A number.}

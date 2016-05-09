@@ -5,8 +5,8 @@
 \title{Add a new knot and use a Metropolis-Hastings step
 to determine if we keep the changes to the model}
 \usage{
-updateCovarianceParameters.binary(numSubjects, firstObsPerSubject, alpha,
-  model.options)
+updateCovarianceParameters.binary(model.options, numSubjects,
+  firstObsPerSubject, alpha)
 }
 \arguments{
 \item{x}{A number.}
