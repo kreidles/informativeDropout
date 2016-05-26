@@ -3,6 +3,54 @@
 #
 #
 
+#####################################
+# Dirichlet process model examples
+#####################################
+
+#
+#
+#
+dp_gaussian_2group_covar <- function() {
+  data <- read.csv("../data/macs4sarah.csv")
+  model.options=dirichlet.model.options(iterations=50000, n.clusters=60, burnin=10,
+                                        dropout.offset=0,
+                                        dropout.estimationTimes = log(seq(3,13,1)),
+                                        dp.concentration=1,
+                                        dp.concentration.alpha=1,
+                                        dp.concentration.beta=1,
+                                        dp.cluster.sigma = diag(3),
+                                        dp.cluster.sigma.nu0 = 5,
+                                        dp.cluster.sigma.T0 = diag(3),
+                                        dp.dist.mu0 = c(0,0,log(7)),
+                                        dp.dist.mu0.mb = c(0,0,log(7)),
+                                        dp.dist.mu0.Sb = diag(3),
+                                        dp.dist.sigma0 = diag(3),
+                                        dp.dist.sigma0.nub = 5,
+                                        dp.dist.sigma0.Tb = diag(3),
+                                        betas.covariates =NULL,
+                                        betas.covariates.mu = c(0,0),
+                                        betas.covariates.sigma = 100*diag(2),
+                                        sigma.error = 1,
+                                        sigma.error.tau = 0.01)
+  
+  data$dropouttime = exp(data$logdropouttime)
+
+  ids.var="CASEID"
+  outcomes.var="logcd4"
+  groups.var="hard"
+  covariates.var=c("logbase", "basebytime") 
+  times.dropout.var="dropouttime"
+  times.observation.var='time'
+  dist='gaussian'
+  
+  set.seed(1066)
+  result = informativeDropout.bayes.dirichlet(data, ids.var, 
+                                              outcomes.var, groups.var,
+                                              covariates.var, 
+                                              times.dropout.var, times.observation.var,
+                                              dist, model.options)
+  
+}
 #
 # Dirichlet process model examples corresponding to the vignettes
 #
@@ -17,18 +65,19 @@ gendata.gaussian_1group_nocovar <- function() {
 
 
 example.dp_gaussian_1group_nocovar <- function() {
-  data <- read.table("../Rnsv/code/sim_sml_1.dat")
+  data <- read.table("../../Rnsv/code/sim_sml_1.dat")
   #data$day = data$years * 365
   
   names(data) <- c("patid", "alpha", "drptm", "b1", "b2",
                    "b2ui", "b2uii", "b2uiii", "t", "e", "yi", "yii", "yiii")
   data$group <- rep(1,nrow(data))
+  data$logdrptm <- log(data$drptm + 1/15)
   # for debugging
   ids.var = "patid"
   outcomes.var = "yi"
   groups.var = "group"
   covariates.var = NULL
-  times.dropout.var = "drptm"
+  times.dropout.var = "logdrptm"
   times.observation.var = "t"
   method="bayes.dirichlet"
   dist = "gaussian"
@@ -117,7 +166,7 @@ example.dp_gaussian_1group_nocovar <- function() {
 
 
 example.dp_binary_1group_nocovar <- function() {
-  data <- read.table("../Rnsv/code/sim_sml_1.dat")
+  data <- read.table("../../Rnsv/code/sim_sml_1.dat")
   #data$day = data$years * 365
   
   names(data) <- c("patid", "alpha", "drptm", "b1", "b2",
@@ -383,16 +432,16 @@ test.example <- function() {
                      sigma.beta = 1, sigmaError.df = 3, sigmaError.scaleMatrix = diag(2))
   
   model.options <- bayes.splines.model.options(iterations=100, burnin=10, thin=NA,
-                                         knots.prob.birth=0.5, knots.min=3, knots.max=10, knots.setpSize=3,
-                                         knots.positions.start=c(330,550,1060), 
-                                         knots.positions.candidate=seq(10,max(data$day),10),
-                                         dropout.estimationTimes=c(1,2,3),
-                                         shape.tau=0.001, rate.tau=0.001,
-                                         sigma.beta=1, lambda.numKnots=1,
-                                         sigma.error=1,
-                                         sigma.error.df = 3,
-                                         sigma.error.scale = diag(2),
-                                         eta.null=NULL)
+                                               knots.prob.birth=0.5, knots.min=3, knots.max=10, knots.setpSize=3,
+                                               knots.positions.start=c(330,550,1060), 
+                                               knots.positions.candidate=seq(10,max(data$day),10),
+                                               dropout.estimationTimes=c(1,2,3),
+                                               shape.tau=0.001, rate.tau=0.001,
+                                               sigma.beta=1, lambda.numKnots=1,
+                                               sigma.error=1,
+                                               sigma.error.df = 3,
+                                               sigma.error.scale = diag(2),
+                                               eta.null=NULL)
   
   
   set.seed(1066)

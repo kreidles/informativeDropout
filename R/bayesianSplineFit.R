@@ -19,11 +19,10 @@
 #' distribution of the residual error
 #' @param sigma.error.rate for Gaussian outcomes, the rate hyperparamter of the inverse gamma
 #' distribution of the residual error
-
 #' @param shape.tau
 #'
 #'
-#' @exportClass bayes.splines.iteration
+#' @export bayes.splines.iteration
 #'
 bayes.splines.iteration <- function(knots=NULL, Theta=NULL, betas.covariates=NULL,
                                     sigma.residual = 1,
@@ -89,7 +88,7 @@ bayes.splines.iteration <- function(knots=NULL, Theta=NULL, betas.covariates=NUL
 #' @param knots.min minimum number of knots in the model. Must be greater than or equal to 1.
 #' @param knots.max maximum number of knots in the model.
 #' 
-#' @exportClass bayes.splines.model.options
+#' @export bayes.splines.model.options
 #' 
 bayes.splines.model.options = function(iterations=10000, burnin=500, thin=NA,
                                        knots.prob.birth=0.5, knots.min=1, knots.max=NA, knots.stepSize=3,

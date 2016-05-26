@@ -35,7 +35,7 @@ require(matrixcalc)
 #' @param expected.slope the expected value of the random slope
 #' @param sigma.error For Gaussian outcomes, the residual error variance
 #' 
-#' @exportClass dirichlet.iteration
+#' @export dirichlet.iteration
 #' 
 dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
                                 cluster.assignments = NULL,
@@ -137,11 +137,11 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
 #' @param betas.covariates.sigma Prior covariance for the covariate regression coefficients
 #' @param sigma.error Prior for the residual error (Gaussian outcomes only)
 #' 
-#' @exportClass dirichlet.model.options
+#' @export dirichlet.model.options
 #' 
 dirichlet.model.options <- function(iterations=10000, burnin=500, thin=NULL,
                                     start.weights.mixing=NULL, n.clusters=15,
-                                    dropout.estimationTimes=NULL, dropout.offset=1/15,
+                                    dropout.estimationTimes=NULL, dropout.offset=0,
                                     dp.concentration=NULL,
                                     dp.concentration.alpha=NULL,
                                     dp.concentration.beta=NULL,
@@ -290,6 +290,73 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=NULL,
   
 }
 
+dirichlet.fit <- function(groups, covariates.var, iterations) {
+  fit = list(
+    # list of group names
+    groups = groups,
+    # list of covariate names
+    covariates.var = covariates.var,
+    # list of dirichlet.iteration objects
+    iterations = iterations
+  )
+  
+  class(fit) <- append(class(fit), "dirichlet.fit")
+  return(fit)
+}
+
+#'
+#' Summarize a Dirichlet model run
+#'
+#'
+#'
+summary.dirichlet.fit <- function(fit) {
+  if (length(fit$iterations) <= 0) {
+    stop("No results found in Dirichlet model fit")
+  }
+  iterations = fit$iterations
+  groups = fit$groups
+  covariates.var = fit$covariates.var
+  
+  result.summary = list()
+  
+  for (group.index in 1:length(groups)) {
+    group = groups[group.index]
+    
+    # total clusters for this group
+    total_clusters = length(iterations[[1]]$cluster.N[[group.index]])
+    
+    # calculate mean, median, and 95% credible interval for the expected intercept
+    expected_slope_sample = unlist(lapply(iterations, function(x) { 
+      expected.slope = x$expected.slope[[group.index]]
+      return (ifelse(is.null(expected.slope), 0, expected.slope))
+    }))
+    # calculate mean, median, and 95% credible interval for the expected intercept
+    expected_intercept_sample = unlist(lapply(iterations, function(x) { 
+      expected.intercept = x$expected.intercept[[group.index]]
+      return (ifelse(is.null(expected.intercept), 0, expected.intercept))
+    }))
+    
+    group_result = list(
+      group = group,
+      total_clusters = total_clusters,
+      expected.slope = data.frame(mean=mean(expected_slope_sample), 
+                                  median=median(expected_slope_sample),
+                                  ci_lower=quantile(expected_slope_sample, probs=0.025),
+                                  ci_upper=quantile(expected_slope_sample, probs=0.975)),
+      expected.intercept = data.frame(mean=mean(expected_intercept_sample), 
+                                  median=median(expected_intercept_sample),
+                                  ci_lower=quantile(expected_intercept_sample, probs=0.025),
+                                  ci_upper=quantile(expected_intercept_sample, probs=0.975))
+    )
+    
+    result.summary[[length(result.summary) + 1]] = group_result
+  }
+  
+  return(result.summary)
+  
+}
+
+
 
 #'
 #' infortmativeDropout.bayes.dirichlet
@@ -307,6 +374,7 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=NULL,
 #' @param dist the distribution of the outcome, valid values are "gaussian" or "binary"
 #' @param model.options model options (see dirichlet.model.options for details)
 #'
+#' @export
 #'
 informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, groups.var, 
                                                covariates.var, 
@@ -408,7 +476,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   start.slope.dropoutTimes = NULL
   if (!is.null(model.options$dropout.estimationTimes)) {
     start.slope.dropoutTimes = lapply(groupList, function(group) {
-      return (matrix(0,length(model.options$dropout.estimationTimes), n.clusters))
+      return (rep(0,length(model.options$dropout.estimationTimes)))
     })
   }
   
@@ -550,7 +618,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       
       # Alpha is concentration parameter of the dirichlet process (step 7)
       # sample latent beta distributed variable (Escobar and West 1995)
-      eta <- rbeta(1, model.options$dp.concentration + 1, group.n)
+      eta <- rbeta(1, model.current$dp.concentration[[group.index]] + 1, group.n)
       # sample the concentration parameter from a mixture of Gamma distributions
       pi.eta <- ((model.options$dp.concentration.alpha + numNonEmptyClusters - 1) /
                    (group.n * (model.options$dp.concentration.beta - log(eta)) +
@@ -558,7 +626,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       # now draw the new concentration parameter for the Dirichlet process
       model.current$dp.concentration[[group.index]] <- 
         ((pi.eta * rgamma(1, model.options$dp.concentration.alpha + numNonEmptyClusters, 
-                          model.options$dp.concentration.beta - log(eta))) + 
+                          model.options$sigma.error.tau - log(eta))) + 
            ((1 - pi.eta) * rgamma(1, model.options$dp.concentration.alpha + numNonEmptyClusters - 1, 
                                   model.options$dp.concentration.beta - log(eta))))
       
@@ -615,7 +683,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
               data.currentCluster[, times.observation.var] * 
               rep(group.betas[group.cluster.assignments==h, 2],
                   group.nobs[group.cluster.assignments==h]) - 
-              data.currentCluster[, covariates.var] %*% group.beta.covariates
+              as.matrix(data.currentCluster[, covariates.var]) %*% matrix(model.current$betas.covariates)
           }
           posterior.mean = (posterior.var * 
                               ((prior.mean/prior.var) + 
@@ -687,7 +755,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
               (data.currentCluster[,outcomes.var] - 
                  rep(group.betas[group.cluster.assignments==h, 1],
                      group.nobs[group.cluster.assignments==h]) - 
-                 data.currentCluster[, covariates.var] %*% group.beta.covariates)
+                 as.matrix(data.currentCluster[, covariates.var]) %*% matrix(model.current$betas.covariates))
           }
           posterior.mean = (posterior.var * 
                               ((prior.mean/prior.var) + 
@@ -753,7 +821,6 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         model.options$dp.cluster.sigma.nu0 + group.n, # <- check typo
         model.options$dp.cluster.sigma.T0 + crossprod(group.betas.deviations)
       )
-      
       ### Update the hyprparameters of the baseline distribution of 
       ### the Dirichlet process (Step 6)
       # update the mean
@@ -827,9 +894,9 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       
       # Estimate E(B1), E(B0) - section 2.4 expectation of random effects (int, slope)
       model.current$expected.intercept[[group.index]] = 
-        sum(clusterProbabilities * model.current$cluster.mu[[group.index]][,1])
+        sum(group.weights.mixing * model.current$cluster.mu[[group.index]][,1])
       model.current$expected.slope[[group.index]] = 
-        sum(clusterProbabilities * model.current$cluster.mu[[group.index]][,2])
+        sum(group.weights.mixing * model.current$cluster.mu[[group.index]][,2])
       
       
     } # END GROUP-SPECIFIC UPDATE LOOP
@@ -850,7 +917,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       residual = data[, outcomes.var] - (intercepts + data[, times.observation.var] * slopes)
       if (!is.null(covariates.var)) {
         residual = residual - as.vector(as.matrix(data[,covariates.var]) %*% 
-                                          model.current$betas.covariates)
+                                          matrix(model.current$betas.covariates))
       }
       g <- model.options$sigma.error.tau + crossprod(residual)/2
       tau <- rgamma(1, model.options$sigma.error.tau + n.total / 2, g)
@@ -864,9 +931,9 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         prior.sigma.inv = solve(model.options$betas.covariates.sigma)
         
         residuals = data[, outcomes.var] - intercepts - slopes * data[, times.observation.var]
-        var = solve(prior.sigma.inv + crossprod(data[,covariates.var]) * sigma.error.inv)
+        var = solve(prior.sigma.inv + crossprod(as.matrix(data[,covariates.var])) * sigma.error.inv)
         
-        m <- var %*% (crossprod(data[, covariates.var], residuals) * sigma.error.inv)
+        m <- var %*% (crossprod(as.matrix(data[, covariates.var]), residuals) * sigma.error.inv)
         model.current$betas.covariates = rmvnorm(1,m,var)
         
       } else {
@@ -928,6 +995,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     modelIterationList[[i]] = model.current
     
   } # END ITERATION LOOP
+  
   
   return(modelIterationList)
 } # END FUNCTION 

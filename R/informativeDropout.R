@@ -63,6 +63,8 @@ wls.binary <- function(y, X, eta.wls, model.options) {
 #' @return 
 #' @examples
 #' 
+#' @export informativeDropout
+#' 
 informativeDropout <- function(data, ids.var, outcomes.var, groups.var, covariates.var, 
                                times.dropout.var, times.observation.var,
                                method="bayes.splines", dist="normal",
