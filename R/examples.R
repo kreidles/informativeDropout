@@ -27,7 +27,7 @@ dp_gaussian_2group_covar <- function() {
                                         dp.dist.sigma0 = diag(3),
                                         dp.dist.sigma0.nub = 5,
                                         dp.dist.sigma0.Tb = diag(3),
-                                        betas.covariates =NULL,
+                                        betas.covariates = c(1.0, 0.1),
                                         betas.covariates.mu = c(0,0),
                                         betas.covariates.sigma = 100*diag(2),
                                         sigma.error = 1,

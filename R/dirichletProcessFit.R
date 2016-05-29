@@ -290,8 +290,23 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=NULL,
   
 }
 
-dirichlet.fit <- function(groups, covariates.var, iterations) {
+#' Model fit for a Dirichlet Process model run
+#' 
+#' @param model.options the original model options
+#' @param dist the distribution of the outcome ("gaussian" or "binary")
+#' @param groups the list of groups
+#' @param covariates.var list of covariate column names
+#' @param iterations the model run iterations after removing burn-in iterations and thinning
+#'
+#' @export dirichlet.fit
+#' 
+dirichlet.fit <- function(model.options, dist, groups, covariates.var, iterations) {
   fit = list(
+    
+    # store the model options for reference
+    model.options = model.options,
+    # distribution of the outcome    
+    dist = dist,
     # list of group names
     groups = groups,
     # list of covariate names
@@ -304,15 +319,19 @@ dirichlet.fit <- function(groups, covariates.var, iterations) {
   return(fit)
 }
 
-#'
+
 #' Summarize a Dirichlet model run
 #'
+#' @param fit dirichlet.fit object from an informativeDropout run.
 #'
-#'
+#' @export summary.dirichlet.fit
+#' 
 summary.dirichlet.fit <- function(fit) {
   if (length(fit$iterations) <= 0) {
     stop("No results found in Dirichlet model fit")
   }
+  dist = fit$dist
+  model.options = fit$model.options
   iterations = fit$iterations
   groups = fit$groups
   covariates.var = fit$covariates.var
@@ -325,6 +344,7 @@ summary.dirichlet.fit <- function(fit) {
     # total clusters for this group
     total_clusters = length(iterations[[1]]$cluster.N[[group.index]])
     
+    ## subject specific effects
     # calculate mean, median, and 95% credible interval for the expected intercept
     expected_slope_sample = unlist(lapply(iterations, function(x) { 
       expected.slope = x$expected.slope[[group.index]]
@@ -336,22 +356,88 @@ summary.dirichlet.fit <- function(fit) {
       return (ifelse(is.null(expected.intercept), 0, expected.intercept))
     }))
     
-    group_result = list(
-      group = group,
-      total_clusters = total_clusters,
-      expected.slope = data.frame(mean=mean(expected_slope_sample), 
-                                  median=median(expected_slope_sample),
-                                  ci_lower=quantile(expected_slope_sample, probs=0.025),
-                                  ci_upper=quantile(expected_slope_sample, probs=0.975)),
-      expected.intercept = data.frame(mean=mean(expected_intercept_sample), 
-                                  median=median(expected_intercept_sample),
-                                  ci_lower=quantile(expected_intercept_sample, probs=0.025),
-                                  ci_upper=quantile(expected_intercept_sample, probs=0.975))
-    )
+    subject_specific_effects = data.frame(
+      mean=c(mean(expected_slope_sample),mean(expected_intercept_sample)),
+      median=c(median(expected_slope_sample), median(expected_intercept_sample)),
+      ci_lower=c(quantile(expected_slope_sample, probs=0.025),
+                 quantile(expected_intercept_sample, probs=0.025)),
+      ci_upper=c(quantile(expected_slope_sample, probs=0.975),
+                 quantile(expected_intercept_sample, probs=0.975))
+      )
+    row.names(subject_specific_effects) = c("slope", "intercept")
     
-    result.summary[[length(result.summary) + 1]] = group_result
+    ## covariance parameters
+    param_list = c("dp.dist.mu0",           
+                   "dp.dist.sigma0", "dp.cluster.sigma",
+                   "dp.concentration")
+    covariance_parameters = data.frame(
+      mean=numeric(length(param_list)),
+      median=numeric(length(param_list)),
+      ci_lower=numeric(length(param_list)),
+      ci_upper=numeric(length(param_list))
+    )
+    row = 1
+    for (param in param_list) {
+      param_sample <- unlist(lapply(iterations, function(x) { 
+        return(x[[param]][[group.index]])
+      }))
+      covariance_parameters$mean[row] = mean(param_sample)
+      covariance_parameters$median[row] = median(param_sample)
+      covariance_parameters$ci_lower[row] = quantile(param_sample, probs=0.025)
+      covariance_parameters$ci_upper[row] = quantile(param_sample, probs=0.975)
+      row = row + 1
+    }
+    row.names(covariance_parameters) = param_list
+       
+    ## dropout time specific slopes
+    slopes_by_dropout_time = data.frame(
+      time=model.options$dropout.estimationTimes,
+      mean=numeric(length(model.options$dropout.estimationTimes)),
+      median=numeric(length(model.options$dropout.estimationTimes)),
+      ci_lower=numeric(length(model.options$dropout.estimationTimes)),
+      ci_upper=numeric(length(model.options$dropout.estimationTimes))
+    )
+    for (time.index in 1:(length(model.options$dropout.estimationTimes))) {
+      slope_sample <- unlist(lapply(iterations, function(x) { 
+        return(x$slope.dropoutTimes[[group.index]][time.index])
+      }))
+      cat(time.index, " ", sum(slope_sample[is.na(slope_sample)]),"\n" )
+      slopes_by_dropout_time$mean[time.index] = mean(slope_sample)
+      slopes_by_dropout_time$median[time.index] = median(slope_sample)
+      slopes_by_dropout_time$ci_lower[time.index] = quantile(slope_sample, probs=0.025)
+      slopes_by_dropout_time$ci_upper[time.index] = quantile(slope_sample, probs=0.975)
+    }  
+    row.names(slopes_by_dropout_time) = NULL
+
+    # build the summary list
+    result.summary[[paste("group", group, sep="_")]] = list(
+      total_clusters = total_clusters,
+      subject_specific_effects = subject_specific_effects,
+      covariance_parameters = covariance_parameters,
+      slopes_by_dropout_time = slopes_by_dropout_time
+    )
   }
   
+  ## TODO for gaussian outcomes, summarize sigma.error
+  
+  ## summarize covariate effects
+  if (!is.null(covariates.var)) {
+    num_covariates = length(covariates.var)
+    covariate_effects = data.frame(mean=numeric(num_covariates), median=numeric(num_covariates),
+                                   ci_lower=numeric(num_covariates), ci_upper=numeric(num_covariates))
+    for(i in 1:length(covariates.var)) {
+      beta_covariate_sample = unlist(lapply(iterations, function(x) { 
+        return(x$betas.covariates[i])
+      }))
+      covariate_effects$mean[i] = mean(beta_covariate_sample)
+      covariate_effects$median[i] = median(beta_covariate_sample)
+      covariate_effects$ci_lower[i] = quantile(beta_covariate_sample, probs=0.025)
+      covariate_effects$ci_upper[i] = quantile(beta_covariate_sample, probs=0.975)
+    }
+    row.names(covariate_effects) <- covariates.var
+    result.summary$covariate_effects = covariate_effects
+  }
+
   return(result.summary)
   
 }
@@ -996,8 +1082,8 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     
   } # END ITERATION LOOP
   
+  return(dirichlet.fit(model.options, dist, groups, covariates.var, modelIterationList))
   
-  return(modelIterationList)
 } # END FUNCTION 
 
 
