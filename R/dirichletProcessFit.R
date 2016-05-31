@@ -139,7 +139,7 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
 #' 
 #' @export dirichlet.model.options
 #' 
-dirichlet.model.options <- function(iterations=10000, burnin=500, thin=NULL,
+dirichlet.model.options <- function(iterations=10000, burnin=500, thin=1, print=1,
                                     start.weights.mixing=NULL, n.clusters=15,
                                     dropout.estimationTimes=NULL, dropout.offset=0,
                                     dp.concentration=NULL,
@@ -241,6 +241,8 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=NULL,
     burnin = burnin,
     # thinning interval
     thin = thin,
+    # print the ith iteration
+    print = print,
     # starting value for mixing weights
     start.weights.mixing = start.weights.mixing,
     # number of clusters in the Dirchlet Process
@@ -401,7 +403,6 @@ summary.dirichlet.fit <- function(fit) {
       slope_sample <- unlist(lapply(iterations, function(x) { 
         return(x$slope.dropoutTimes[[group.index]][time.index])
       }))
-      cat(time.index, " ", sum(slope_sample[is.na(slope_sample)]),"\n" )
       slopes_by_dropout_time$mean[time.index] = mean(slope_sample)
       slopes_by_dropout_time$median[time.index] = median(slope_sample)
       slopes_by_dropout_time$ci_lower[time.index] = quantile(slope_sample, probs=0.025)
@@ -612,7 +613,8 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   
   
   # initialize the first model iteration
-  modelIterationList <- vector(mode = "list", length = model.options$iterations)
+  iterations.saved = ceiling((model.options$iterations - model.options$burnin) / model.options$thin)
+  modelIterationList <- vector(mode = "list", length = iterations.saved)
   modelIterationList[[1]] = dirichlet.iteration(
     weights.mixing=weights.mixing, 
     weights.conditional=weights.conditional,
@@ -626,17 +628,20 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     dp.concentration=concentration, 
     cluster.N = n.perCluster,
     cluster.mu=cluster.mu, 
-    expected.intercept=NULL, expected.slope=NULL,
+    expected.intercept=rep(0, length(groupList)), expected.slope=rep(0, length(groupList)),
     slope.dropoutTimes = start.slope.dropoutTimes,
     sigma.error = sigma.error
   )
   
+  model.previous = modelIterationList[[1]]
+  iterations.saved.next = 2
   for (i in 2:model.options$iterations) {
     
-    print(paste("ITER = ", i, sep=""))
-    
-    model.previous = modelIterationList[[i-1]]
-    # make a copy which will be modified as we move through the iteration
+    if (i %% model.options$print == 0) {
+      print(paste("ITER = ", i, sep=""))
+    }
+   
+    # make a copy of the previous iteration which will be modified as we move through the iteration
     model.current = model.previous
     
     for (group.index in 1:length(groupList)) {
@@ -726,7 +731,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         S <- solve(dp.dist.sigma0.inv + group.cluster.N[h] * dp.cluster.sigma.inv)
         if (group.cluster.N[h] == 1) {
           m <- S %*% (dp.dist.sigma0.inv %*% group.dp.dist.mu0 + 
-                        dp.cluster.sigma.inv %*% ((group.betas[group.cluster.assignments==h,])) )
+                        dp.cluster.sigma.inv %*% ((group.betas[group.cluster.assignments==h,])))
         } else {
           m <- S %*%(dp.dist.sigma0.inv %*% group.dp.dist.mu0 + 
                        dp.cluster.sigma.inv %*% (colSums(group.betas[group.cluster.assignments==h,])) )
@@ -997,19 +1002,6 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
                              nobj.perGroup[[group.index]]))
     }
     
-    if (dist == "gaussian") {
-      ## TODO: remove group specific variables, use betas (random effects)
-      # Step 9 Update sigma.error with inverse gamma
-      residual = data[, outcomes.var] - (intercepts + data[, times.observation.var] * slopes)
-      if (!is.null(covariates.var)) {
-        residual = residual - as.vector(as.matrix(data[,covariates.var]) %*% 
-                                          matrix(model.current$betas.covariates))
-      }
-      g <- model.options$sigma.error.tau + crossprod(residual)/2
-      tau <- rgamma(1, model.options$sigma.error.tau + n.total / 2, g)
-      model.current$sigma.error = 1 / tau
-    } 
-    
     # update fixed effects associated with covariates
     if (!is.null(covariates.var)) {
       if (dist == "gaussian") {
@@ -1077,12 +1069,31 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       }
     }
     
+    if (dist == "gaussian") {
+      ## TODO: remove group specific variables, use betas (random effects)
+      # Step 9 Update sigma.error with inverse gamma
+      residual = data[, outcomes.var] - (intercepts + data[, times.observation.var] * slopes)
+      if (!is.null(covariates.var)) {
+        residual = residual - as.vector(as.matrix(data[,covariates.var]) %*% 
+                                          matrix(model.current$betas.covariates))
+      }
+      g <- model.options$sigma.error.tau + crossprod(residual)/2
+      tau <- rgamma(1, model.options$sigma.error.tau + n.total / 2, g)
+      model.current$sigma.error = 1 / tau
+    } 
+    
     # save the current iteration
-    modelIterationList[[i]] = model.current
+    model.previous = model.current
+    if ((i %% model.options$thin == 0 && iterations.saved.next <= length(modelIterationList)) || 
+        iterations.saved.next == length(modelIterationList)) {
+      modelIterationList[[iterations.saved.next]] = model.current
+      iteration.saved.next = iterations.saved.next + 1
+    }
+    
     
   } # END ITERATION LOOP
   
-  return(dirichlet.fit(model.options, dist, groups, covariates.var, modelIterationList))
+  return(dirichlet.fit(model.options, dist, groupList, covariates.var, modelIterationList))
   
 } # END FUNCTION 
 

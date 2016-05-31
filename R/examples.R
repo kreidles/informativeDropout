@@ -12,7 +12,7 @@
 #
 dp_gaussian_2group_covar <- function() {
   data <- read.csv("../data/macs4sarah.csv")
-  model.options=dirichlet.model.options(iterations=50000, n.clusters=60, burnin=10,
+  model.options=dirichlet.model.options(iterations=1000, n.clusters=60, burnin=100, thin=1,
                                         dropout.offset=0,
                                         dropout.estimationTimes = log(seq(3,13,1)),
                                         dp.concentration=1,
