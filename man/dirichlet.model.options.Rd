@@ -5,9 +5,9 @@
 \title{Model options for the Dirichlet Process model.  Includes starting values, priors and
 simulation/MCMC parameters.}
 \usage{
-dirichlet.model.options(iterations = 10000, burnin = 500, thin = NULL,
+dirichlet.model.options(iterations = 10000, burnin = 500, thin = 1,
   start.weights.mixing = NULL, n.clusters = 15,
-  dropout.estimationTimes = NULL, dropout.offset = 1/15,
+  dropout.estimationTimes = NULL, dropout.offset = 0,
   dp.concentration = NULL, dp.concentration.alpha = NULL,
   dp.concentration.beta = NULL, dp.cluster.sigma = NULL,
   dp.cluster.sigma.nu0 = NULL, dp.cluster.sigma.T0 = NULL,

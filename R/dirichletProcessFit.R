@@ -399,14 +399,15 @@ summary.dirichlet.fit <- function(fit) {
       ci_lower=numeric(length(model.options$dropout.estimationTimes)),
       ci_upper=numeric(length(model.options$dropout.estimationTimes))
     )
-    for (time.index in 1:(length(model.options$dropout.estimationTimes))) {
+    for (time.index in 1:(length(4))) {
+      print(time.index)
       slope_sample <- unlist(lapply(iterations, function(x) { 
         return(x$slope.dropoutTimes[[group.index]][time.index])
       }))
       slopes_by_dropout_time$mean[time.index] = mean(slope_sample)
       slopes_by_dropout_time$median[time.index] = median(slope_sample)
-      slopes_by_dropout_time$ci_lower[time.index] = quantile(slope_sample, probs=0.025)
-      slopes_by_dropout_time$ci_upper[time.index] = quantile(slope_sample, probs=0.975)
+      slopes_by_dropout_time$ci_lower[time.index] = quantile(slope_sample, na.rm=TRUE, probs=0.025)
+      slopes_by_dropout_time$ci_upper[time.index] = quantile(slope_sample, na.rm=TRUE, probs=0.975)
     }  
     row.names(slopes_by_dropout_time) = NULL
 
@@ -443,6 +444,55 @@ summary.dirichlet.fit <- function(fit) {
   
 }
 
+#' Produce a trace plot of the specified variable in Dirichlet model fit
+#' 
+#' @param fit the Dirichlet model fit 
+#' @param variable the variable to plot
+#' @group (optional) the group to plot.  If not specified, separate plots will
+#'    be produced for each group
+#'
+#' @export plot.trace.dirichlet.fit
+plot.trace.dirichlet.fit <- function (fit, variable=NULL, group=1) {
+  sample = unlist(lapply(fit$iterations, function(x) { 
+    return(x[[variable]][[group]])
+  }))
+  ts.plot(sample)
+}
+# density plot for a parameter
+plot.density <- function (x, ...) {
+  
+}
+# plot the slope by dropout time
+plot.slopeByDropout.dirichlet.fit <- function (fit, group=1, xlim=NULL, ylim=NULL) {
+
+  slopes_by_dropout_time = data.frame(
+    time=model.options$dropout.estimationTimes,
+    mean=numeric(length(model.options$dropout.estimationTimes)),
+    median=numeric(length(model.options$dropout.estimationTimes)),
+    ci_lower=numeric(length(model.options$dropout.estimationTimes)),
+    ci_upper=numeric(length(model.options$dropout.estimationTimes))
+  )
+  for (time.index in 1:(length(model.options$dropout.estimationTimes))) {
+    slope_sample <- unlist(lapply(fit$iterations, function(x) { 
+      return(x$slope.dropoutTimes[[group]][time.index])
+    }))
+    slopes_by_dropout_time$mean[time.index] = mean(slope_sample)
+    slopes_by_dropout_time$median[time.index] = median(slope_sample)
+    slopes_by_dropout_time$ci_lower[time.index] = quantile(slope_sample, probs=0.025)
+    slopes_by_dropout_time$ci_upper[time.index] = quantile(slope_sample, probs=0.975)
+  }  
+  row.names(slopes_by_dropout_time) = NULL
+  
+  plot(slopes_by_dropout_time$time, slopes_by_dropout_time$mean, "l", xlim=c(0,5), ylim=c(-1,1),
+       xlab="Dropout time", ylab="Expected Slope")
+  lines(slopes_by_dropout_time$time, slopes_by_dropout_time$ci_lower, "l", lty=3)
+  lines(slopes_by_dropout_time$time, slopes_by_dropout_time$ci_upper, "l", lty=3)
+}
+
+# perform sensitivity analysis on the slope results
+sensitivity.slope <- function(x, ...) {
+  UseMethod("sensitivity.slope")
+}
 
 
 #'
@@ -611,11 +661,11 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     sigma.error = model.options$sigma.error
   }
   
-  
   # initialize the first model iteration
   iterations.saved = ceiling((model.options$iterations - model.options$burnin) / model.options$thin)
   modelIterationList <- vector(mode = "list", length = iterations.saved)
-  modelIterationList[[1]] = dirichlet.iteration(
+  
+  model.previous = dirichlet.iteration(
     weights.mixing=weights.mixing, 
     weights.conditional=weights.conditional,
     betas = betas, 
@@ -633,9 +683,8 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     sigma.error = sigma.error
   )
   
-  model.previous = modelIterationList[[1]]
-  iterations.saved.next = 2
-  for (i in 2:model.options$iterations) {
+  iterations.saved.next = 1
+  for (i in 1:model.options$iterations) {
     
     if (i %% model.options$print == 0) {
       print(paste("ITER = ", i, sep=""))
@@ -954,13 +1003,13 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       model.current$density.intercept[[group.index]] <- colSums(sim.int)
       model.current$density.slope[[group.index]] <- colSums(sim.slope)
       
-      # Equation 19
+      # Equation 19 -- TODO ERROR IN THIS BLOCK!!!!!
       #Estimate slope at each dropout time
       if (!is.null(model.options$dropout.estimationTimes)) {
         tmp = matrix(0,length(model.options$dropout.estimationTimes), n.clusters)
         for (h in 1:n.clusters) {
           tmp[,h] = (
-            clusterProbabilities[h] * 
+            group.weights.mixing[h] * 
               dnorm(log(model.options$dropout.estimationTimes),
                     model.current$cluster.mu[[group.index]][h,3],
                     sqrt(model.current$dp.cluster.sigma[[group.index]][3,3]))
@@ -1084,10 +1133,11 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     
     # save the current iteration
     model.previous = model.current
-    if ((i %% model.options$thin == 0 && iterations.saved.next <= length(modelIterationList)) || 
+    if ((i %% model.options$thin == 0 && i > model.options$burnin &&
+         iterations.saved.next <= length(modelIterationList)) || 
         iterations.saved.next == length(modelIterationList)) {
       modelIterationList[[iterations.saved.next]] = model.current
-      iteration.saved.next = iterations.saved.next + 1
+      iterations.saved.next = iterations.saved.next + 1
     }
     
     

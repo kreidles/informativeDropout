@@ -6,7 +6,7 @@
 during the RJMCMC run}
 \usage{
 bayes.splines.iteration(knots = NULL, Theta = NULL,
-  betas.covariates = NULL, sigma.spline = 1, sigma.randomIntercept = 1,
+  betas.covariates = NULL, sigma.residual = 1, sigma.randomIntercept = 1,
   sigma.randomSlope = 1, sigma.randomInterceptSlope = 0, sigma.error = 1,
   sigma.error.shape = 0.001, sigma.error.rate = 0.001)
 }
@@ -17,7 +17,7 @@ bayes.splines.iteration(knots = NULL, Theta = NULL,
 
 \item{betas.covariates}{regression coefficients related to covariates}
 
-\item{sigma.spline}{covariance of the spline coefficients}
+\item{sigma.residual}{covariance of the spline coefficients}
 
 \item{sigma.randomIntercept}{variance of the random intercepts}
 

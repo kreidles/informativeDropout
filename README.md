@@ -17,6 +17,8 @@ Non-Ignorable Dropout, In review.
 The results in the above manuscript were produced using R version 3.2.4. To reproduce the results,
 perform the following steps:
 
+* Add dependencies!!
+
 * Install R version 3.2.x or higher by following the instructions at http://www.r-project.org
 * From the R environment, install and load the "devtools" package
 ```R
@@ -25,7 +27,7 @@ library(devtools)
 ```
 * Install the "informativeDropout" package directly from Github.com
 ```R
-install_github(repo="informativeDropout", user="kreidles", ref="develop")
+install_github(repo="kreidles/informativeDropout", ref="develop")
 ```
 * Load the library
 ```R

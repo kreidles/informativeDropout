@@ -55,6 +55,28 @@ wls.binary <- function(y, X, eta.wls, model.options) {
 } 
 
 
+#
+# Register some S3 generic methods for summarizing the fit object
+#
+
+# trace plot for a parameter
+plot.trace <- function (x, ...) {
+  UseMethod("plot.trace", x)
+}
+# density plot for a parameter
+plot.density <- function (x, ...) {
+  UseMethod("plot.density", x)
+}
+# plot the slope by dropout time
+plot.slopeByDropout <- function (x, ...) {
+  UseMethod("plot.slopeByDropout", x)
+}
+# perform sensitivity analysis on the slope results
+sensitivity.slope <- function(x, ...) {
+  UseMethod("sensitivity.slope")
+}
+
+
 #' Fit a varying coefficient model for longitudinal studies with
 #' informative dropout. 
 #' 

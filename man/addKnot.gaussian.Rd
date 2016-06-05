@@ -7,7 +7,7 @@ to determine if we keep the changes to the model}
 \usage{
 addKnot.gaussian(model.options, knots.previous, outcomes, times.dropout,
   times.observation, covariates, X.previous, Theta.previous, Z, alpha,
-  betaCovariates, sigma.beta, sigma.residual, sigma.error, lambda.numKnots)
+  betaCovariates, sigma.error)
 }
 \description{
 Add a new knot and use a Metropolis-Hastings step

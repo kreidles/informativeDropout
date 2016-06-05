@@ -12,9 +12,9 @@
 #
 dp_gaussian_2group_covar <- function() {
   data <- read.csv("../data/macs4sarah.csv")
-  model.options=dirichlet.model.options(iterations=1000, n.clusters=60, burnin=100, thin=1,
+  model.options=dirichlet.model.options(iterations=500, n.clusters=60, burnin=0, thin=1,
                                         dropout.offset=0,
-                                        dropout.estimationTimes = log(seq(3,13,1)),
+                                        dropout.estimationTimes = seq(2,13,1),
                                         dp.concentration=1,
                                         dp.concentration.alpha=1,
                                         dp.concentration.beta=1,
@@ -44,7 +44,7 @@ dp_gaussian_2group_covar <- function() {
   dist='gaussian'
   
   set.seed(1066)
-  result = informativeDropout.bayes.dirichlet(data, ids.var, 
+  fit = informativeDropout.bayes.dirichlet(data, ids.var, 
                                               outcomes.var, groups.var,
                                               covariates.var, 
                                               times.dropout.var, times.observation.var,
@@ -558,7 +558,7 @@ binary_1group_nocovar <- function() {
   method="bayes.splines"
   dist = "binary"
   
-  model.options <- bayes.splines.model.options(iterations=100, burnin=10, thin=NA,
+  model.options <- bayes.splines.model.options(iterations=50, burnin=0, thin=NA,
                                                knots.prob.birth=0.2, knots.min=1, knots.max=10, 
                                                knots.stepSize=0.1,
                                                knots.positions.start=c(0,7/30,0.5, 23/30,1), 

@@ -6,11 +6,15 @@
 \usage{
 bayes.splines.model.options(iterations = 10000, burnin = 500, thin = NA,
   knots.prob.birth = 0.5, knots.min = 1, knots.max = NA,
-  knots.positions.start = NULL, knots.positions.candidate = NULL,
-  prob.min = 1e-05, prob.max = 0.99999, dropout.estimationTimes = NULL,
-  shape.tau = NULL, rate.tau = NULL, sigma.beta = NULL,
-  lambda.numKnots = NULL, sigma.error = 0, sigma.error.df = NULL,
-  sigma.error.scale = NULL, eta.null = NULL)
+  knots.stepSize = 3, knots.positions.start = NULL,
+  knots.positions.candidate = NULL, prob.min = 1e-05, prob.max = 0.99999,
+  accept.rate.adjust = 1, dropout.estimationTimes = NULL,
+  sigma.beta = NULL, sigma.residual = NULL, sigma.error = 0,
+  sigma.error.shape.tau = NULL, sigma.error.rate.tau = NULL,
+  lambda.numKnots = NULL, sigma.randomIntercept = NULL,
+  sigma.randomSlope = NULL, sigma.randomInterceptSlope = NULL,
+  sigma.randomEffects.df = NULL, sigma.randomEffects.scale = NULL,
+  eta.null = NULL)
 }
 \arguments{
 \item{iterations}{number of iterations for the MCMC simulation}
