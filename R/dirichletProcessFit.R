@@ -399,8 +399,7 @@ summary.dirichlet.fit <- function(fit) {
       ci_lower=numeric(length(model.options$dropout.estimationTimes)),
       ci_upper=numeric(length(model.options$dropout.estimationTimes))
     )
-    for (time.index in 1:(length(4))) {
-      print(time.index)
+    for (time.index in 1:(length(model.options$dropout.estimationTimes))) {
       slope_sample <- unlist(lapply(iterations, function(x) { 
         return(x$slope.dropoutTimes[[group.index]][time.index])
       }))
@@ -483,7 +482,7 @@ plot.slopeByDropout.dirichlet.fit <- function (fit, group=1, xlim=NULL, ylim=NUL
   }  
   row.names(slopes_by_dropout_time) = NULL
   
-  plot(slopes_by_dropout_time$time, slopes_by_dropout_time$mean, "l", xlim=c(0,5), ylim=c(-1,1),
+  plot(slopes_by_dropout_time$time, slopes_by_dropout_time$mean, "l", xlim=xlim, ylim=ylim,
        xlab="Dropout time", ylab="Expected Slope")
   lines(slopes_by_dropout_time$time, slopes_by_dropout_time$ci_lower, "l", lty=3)
   lines(slopes_by_dropout_time$time, slopes_by_dropout_time$ci_upper, "l", lty=3)
