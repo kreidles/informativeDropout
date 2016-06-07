@@ -31,7 +31,7 @@ dp_gaussian_2group_covar <- function() {
                                         betas.covariates.mu = c(0,0),
                                         betas.covariates.sigma = 100*diag(2),
                                         sigma.error = 1,
-                                        sigma.error.tau = 0.01)
+                                        sigma.error.tau = 0.001)
   
   data$dropouttime = exp(data$logdropouttime)
 

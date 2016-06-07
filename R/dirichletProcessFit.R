@@ -1003,7 +1003,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       model.current$density.intercept[[group.index]] <- colSums(sim.int)
       model.current$density.slope[[group.index]] <- colSums(sim.slope)
       
-      # Equation 19 -- TODO ERROR IN THIS BLOCK!!!!!
+      # Equation 19 
       #Estimate slope at each dropout time
       if (!is.null(model.options$dropout.estimationTimes)) {
         tmp = matrix(0,length(model.options$dropout.estimationTimes), n.clusters)
@@ -1024,7 +1024,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
             sum(p[u,] * 
                   (model.current$cluster.mu[[group.index]][,2] + 
                      covar[2,3] * 
-                     (log(u) - model.current$cluster.mu[[group.index]][,2]) /
+                     (log(dropoutTime) - model.current$cluster.mu[[group.index]][,3]) /
                      covar[3,3]))
           )
         }
