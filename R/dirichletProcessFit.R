@@ -451,14 +451,41 @@ summary.dirichlet.fit <- function(fit) {
 #'    be produced for each group
 #'
 #' @export plot.trace.dirichlet.fit
-plot.trace.dirichlet.fit <- function (fit, variable=NULL, group=1) {
-  sample = unlist(lapply(fit$iterations, function(x) { 
-    return(x[[variable]][[group]])
-  }))
+plot.trace.dirichlet.fit <- function (fit, type="expectation", name="slope", group=1) {
+  if (type == "expectation") {
+    varname = paste("expected", name, sep=".")
+    sample = unlist(lapply(fit$iterations, function(x) { 
+      return(x[[varname]][[group]])
+    }))
+  } else if (type == "betas.covariates") {
+    index = which(fit$covariates == name)
+    if (length(index) <= 0) {
+      stop("Invalid covariate")
+    }
+    sample = unlist(lapply(fit$iterations, function(x) { 
+      return(x[[type]][[index]])
+    }))
+  } else if (type == "dp.concentration") {
+    sample = unlist(lapply(fit$iterations, function(x) { 
+      return(x[[type]][[group]])
+    }))
+  } else if (type == "sigma.error") {
+    sample = unlist(lapply(fit$iterations, function(x) { 
+      return(x[[type]])
+    }))
+  } else if (type == "slope.dropoutTimes") {
+    sample = unlist(lapply(fit$iterations, function(x) { 
+      return(x[[type]][[group]][[name]])
+    }))
+  } else {
+    stop("Invalid type")
+  }
+
   ts.plot(sample)
 }
+
 # density plot for a parameter
-plot.density <- function (x, ...) {
+plot.density.dirichlet.fit <- function (fit, name="slope") {
   
 }
 # plot the slope by dropout time
