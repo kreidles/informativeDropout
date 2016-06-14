@@ -72,7 +72,12 @@ plot.slopeByDropout <- function (x, ...) {
   UseMethod("plot.slopeByDropout", x)
 }
 # perform sensitivity analysis on the slope results
-sensitivity.slope <- function(x, ...) {
+sensitivity <- function(x, ...) {
+  # delta factor is multiplier on slope after dropout
+  # y = int + drop * slope + (time - dropout) * delta * slope
+  # arguments: min/max times, list of estimation times, 
+  # multiple deltas
+  # vector of covariate values by time
   UseMethod("sensitivity.slope")
 }
 
@@ -110,21 +115,5 @@ informativeDropout <- function(data, ids.var, outcomes.var, groups.var, covariat
   
 }
 
-acceptanceProbability <- function(fit, action) {
-  if (action == "knot.add") {
-    total_accepts = sum(sapply(fit, function(x) { return(as.numeric(x$accepted$knot.add)) }))
-  } else if (action == "knot.remove") {
-    total_accepts = sum(sapply(fit, function(x) { return(as.numeric(x$accepted$knot.remove)) }))
-  } else if (action == "knot.move") {
-    total_accepts = sum(sapply(fit, function(x) { return(as.numeric(x$accepted$knot.move)) }))
-    
-  } else if (action == "fixedEffects") {
-    total_accepts = sum(sapply(fit, function(x) { return(as.numeric(x$accepted$fixedEffects)) }))
-  } else if (action == "fixedEffectsCovariates") {
-    total_accepts = sum(sapply(fit, function(x) { return(as.numeric(x$accepted$fixedEffectsCovariates)) }))
-  }
-  
-  
-  return(total_accepts/length(fit))
-}
+
 

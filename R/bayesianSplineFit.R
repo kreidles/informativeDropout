@@ -90,7 +90,7 @@ bayes.splines.iteration <- function(knots=NULL, Theta=NULL, betas.covariates=NUL
 #' 
 #' @export bayes.splines.model.options
 #' 
-bayes.splines.model.options = function(iterations=10000, burnin=500, thin=NA,
+bayes.splines.model.options = function(iterations=10000, burnin=500, thin=1, print=1,
                                        knots.prob.birth=0.5, knots.min=1, knots.max=NA, knots.stepSize=3,
                                        knots.positions.start=NULL, knots.positions.candidate=NULL,
                                        prob.min=0.00001, prob.max=0.99999, accept.rate.adjust=1,
@@ -151,6 +151,8 @@ bayes.splines.model.options = function(iterations=10000, burnin=500, thin=NA,
     burnin = burnin,
     # thinning interval
     thin = thin,
+    # printing interval
+    print = print,
     # probability of adding a knot on a given iteration
     knots.prob.birth = knots.prob.birth,
     # minimum number of knots
@@ -198,6 +200,35 @@ bayes.splines.model.options = function(iterations=10000, burnin=500, thin=NA,
   class(opts) <- append(class(opts), "bayes.splines.model.options")
   return(opts)
   
+}
+
+#' Model fit for a Bayesian spline model run
+#' 
+#' @param model.options the original model options
+#' @param dist the distribution of the outcome ("gaussian" or "binary")
+#' @param groups the list of groups
+#' @param covariates.var list of covariate column names
+#' @param iterations the model run iterations after removing burn-in iterations and thinning
+#'
+#' @export bayes.splines.fit
+#' 
+bayes.splines.fit <- function(model.options, dist, groups, covariates.var, iterations) {
+  fit = list(
+    
+    # store the model options for reference
+    model.options = model.options,
+    # distribution of the outcome    
+    dist = dist,
+    # list of group names
+    groups = groups,
+    # list of covariate names
+    covariates.var = covariates.var,
+    # list of dirichlet.iteration objects
+    iterations = iterations
+  )
+  
+  class(fit) <- append(class(fit), "bayes.splines.fit")
+  return(fit)
 }
 
 #'
@@ -1369,14 +1400,202 @@ getInitialEstimatesCovariates <- function(dist, covariates, outcomes) {
 }
 
 #'
+#' calculate the acceptance probability for a given update step in the Bayesian
+#' spline model run.
+#' 
+#' @param fit the bayes.splines.fit object
+#' @param action the update action.  Valid values are "knot.add", "knot.remove",
+#' "knot.move", "fixedEffects", "fixedEffectsCovariates"
+#'
+#' @export prob.acceptance
+#' 
+prob.acceptance <- function(fit, action) {
+  iterations = fit$iterations
+  if (action == "knot.add") {
+    total_accepts = sum(sapply(iterations, function(x) { return(as.numeric(x$accepted$knot.add)) }))
+  } else if (action == "knot.remove") {
+    total_accepts = sum(sapply(iterations, function(x) { return(as.numeric(x$accepted$knot.remove)) }))
+  } else if (action == "knot.move") {
+    total_accepts = sum(sapply(iterations, function(x) { return(as.numeric(x$accepted$knot.move)) }))
+    
+  } else if (action == "fixedEffects") {
+    total_accepts = sum(sapply(iterations, function(x) { return(as.numeric(x$accepted$fixedEffects)) }))
+  } else if (action == "fixedEffectsCovariates") {
+    total_accepts = sum(sapply(iterations, function(x) { return(as.numeric(x$accepted$fixedEffectsCovariates)) }))
+  }
+  
+  
+  return(total_accepts/length(iterations))
+}
+
+
+#' Summarize a Bayesian spline model run
+#'
+#' @param fit bayes.splines.fit object from an informativeDropout run.
+#'
+#' @export summary.bayes.splines.fit
+#' 
+summary.bayes.splines.fit <- function(fit) {
+  if (length(fit$iterations) <= 0) {
+    stop("No results found in Bayesian spline model fit")
+  }
+  dist = fit$dist
+  model.options = fit$model.options
+  iterations = fit$iterations
+  groups = fit$groups
+  covariates.var = fit$covariates.var
+  
+  result.summary = list()
+  
+  for (group.index in 1:length(groups)) {
+    group = groups[group.index]
+    
+    ## subject specific effects
+    # calculate mean, median, and 95% credible interval for the expected intercept
+    expected_slope_sample = unlist(lapply(iterations, function(x) { 
+      expected.slope = x$expected.slope[[group.index]]
+      return (ifelse(is.null(expected.slope), 0, expected.slope))
+    }))
+    # calculate mean, median, and 95% credible interval for the expected intercept
+    expected_intercept_sample = unlist(lapply(iterations, function(x) { 
+      expected.intercept = x$expected.intercept[[group.index]]
+      return (ifelse(is.null(expected.intercept), 0, expected.intercept))
+    }))
+    
+    subject_specific_effects = data.frame(
+      mean=c(mean(expected_slope_sample),mean(expected_intercept_sample)),
+      median=c(median(expected_slope_sample), median(expected_intercept_sample)),
+      ci_lower=c(quantile(expected_slope_sample, probs=0.025),
+                 quantile(expected_intercept_sample, probs=0.025)),
+      ci_upper=c(quantile(expected_slope_sample, probs=0.975),
+                 quantile(expected_intercept_sample, probs=0.975))
+    )
+    row.names(subject_specific_effects) = c("slope", "intercept")
+    
+    ## covariance parameters
+    param_list = c("dp.dist.mu0",           
+                   "dp.dist.sigma0", "dp.cluster.sigma",
+                   "dp.concentration")
+    covariance_parameters = data.frame(
+      mean=numeric(length(param_list)),
+      median=numeric(length(param_list)),
+      ci_lower=numeric(length(param_list)),
+      ci_upper=numeric(length(param_list))
+    )
+    row = 1
+    for (param in param_list) {
+      param_sample <- unlist(lapply(iterations, function(x) { 
+        return(x[[param]][[group.index]])
+      }))
+      covariance_parameters$mean[row] = mean(param_sample)
+      covariance_parameters$median[row] = median(param_sample)
+      covariance_parameters$ci_lower[row] = quantile(param_sample, probs=0.025)
+      covariance_parameters$ci_upper[row] = quantile(param_sample, probs=0.975)
+      row = row + 1
+    }
+    row.names(covariance_parameters) = param_list
+    
+    ## dropout time specific slopes
+    slopes_by_dropout_time = data.frame(
+      time=model.options$dropout.estimationTimes,
+      mean=numeric(length(model.options$dropout.estimationTimes)),
+      median=numeric(length(model.options$dropout.estimationTimes)),
+      ci_lower=numeric(length(model.options$dropout.estimationTimes)),
+      ci_upper=numeric(length(model.options$dropout.estimationTimes))
+    )
+    for (time.index in 1:(length(model.options$dropout.estimationTimes))) {
+      slope_sample <- unlist(lapply(iterations, function(x) { 
+        return(x$slope.dropoutTimes[[group.index]][time.index])
+      }))
+      slopes_by_dropout_time$mean[time.index] = mean(slope_sample)
+      slopes_by_dropout_time$median[time.index] = median(slope_sample)
+      slopes_by_dropout_time$ci_lower[time.index] = quantile(slope_sample, na.rm=TRUE, probs=0.025)
+      slopes_by_dropout_time$ci_upper[time.index] = quantile(slope_sample, na.rm=TRUE, probs=0.975)
+    }  
+    row.names(slopes_by_dropout_time) = NULL
+    
+    # build the summary list
+    result.summary[[paste("group", group, sep="_")]] = list(
+      total_clusters = total_clusters,
+      subject_specific_effects = subject_specific_effects,
+      covariance_parameters = covariance_parameters,
+      slopes_by_dropout_time = slopes_by_dropout_time
+    )
+  }
+  
+  ## TODO for gaussian outcomes, summarize sigma.error
+  
+  ## summarize covariate effects
+  if (!is.null(covariates.var)) {
+    num_covariates = length(covariates.var)
+    covariate_effects = data.frame(mean=numeric(num_covariates), median=numeric(num_covariates),
+                                   ci_lower=numeric(num_covariates), ci_upper=numeric(num_covariates))
+    for(i in 1:length(covariates.var)) {
+      beta_covariate_sample = unlist(lapply(iterations, function(x) { 
+        return(x$betas.covariates[i])
+      }))
+      covariate_effects$mean[i] = mean(beta_covariate_sample)
+      covariate_effects$median[i] = median(beta_covariate_sample)
+      covariate_effects$ci_lower[i] = quantile(beta_covariate_sample, probs=0.025)
+      covariate_effects$ci_upper[i] = quantile(beta_covariate_sample, probs=0.975)
+    }
+    row.names(covariate_effects) <- covariates.var
+    result.summary$covariate_effects = covariate_effects
+  }
+  
+  if (dist == "gaussian") {
+    sigma_error_sample = unlist(lapply(iterations, function(x) { 
+      return(x$sigma.error)
+    }))
+    sigma_error_result = data.frame(
+      mean = mean(sigma_error_sample),
+      median = median(sigma_error_sample),
+      ci_lower = quantile(sigma_error_sample, probs=0.025),
+      ci_upper = quantile(sigma_error_sample, probs=0.975)
+    )
+    row.names(sigma_error_result) = "sigma.error"
+    
+    result.summary$sigma.error = sigma_error_result
+  }
+  
+  
+  # calculate acceptance probability
+  acceptance_probabilities = data.frame(probability=c(
+    prob.acceptance(result, "knot.add"),
+    prob.acceptance(result, "knot.remove"),
+    prob.acceptance(result, "knot.move"),
+    prob.acceptance(result, "fixedEffects"),
+    prob.acceptance(result, "fixedEffectsCovariates")
+  ))
+  row.names(acceptance_probabilities) = c(
+    "knot.add", "knot.remove", "knot.move", "fixedEffects", "fixedEffectsCovariates"
+    )
+  result.summary$acceptance_probabilities = acceptance_probabilities
+  
+  return(result.summary)
+  
+}
+
+
+
+
+#'
 #' Fit a varying coefficient model for longitudinal studies with
 #' informative dropout.  Uses a Bayesian approach with a spline fit
 #' to model the relationship between dropout times and slope
 #'
+#' @param data the data set
+#' @param ids.var column of the data set containing the participant id
+#' @param outcomes.var column of the data set containing the outcome variable
+#' @param groups.var column of the data set indicating treatment group
+#' @param covariates.var list of columns of the data set containing covariates
+#' @param times.dropout.var column of the data set containing dropout times
+#' @param times.observation.var column of the data set containing observation times
+#' @param dist distribution of the outcome (either "gaussian" or "binary")
+#' @param model.options the bayes.spines.model.options object (@@seealso bayes.spines.model.options)
 #' 
-#'
-#'
-#'
+#' @export informativeDropout.bayes.splines
+#' 
 informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups.var, 
                                              covariates.var, times.dropout.var, times.observation.var, 
                                              dist, model.options) {
@@ -1468,7 +1687,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       eta.null = model.options$eta.null
     } else {
       eta.null = lapply(subjectsPerGroup, function(N) {
-        return(logit(rep(sum(y)/N, N)))
+        return(logit(rep(sum(outcomes)/N, N)))
       })
     }
   }
@@ -1476,8 +1695,10 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   
   # initialize the first model iteration
   # TODO: mcmc options specify starting values
-  modelIterationList <- vector(mode = "list", length = model.options$iterations)
-  modelIterationList[[1]] = 
+  iterations.saved = ceiling((model.options$iterations - model.options$burnin) / model.options$thin)
+  modelIterationList <- vector(mode = "list", length = iterations.saved)
+  
+  model.previous = 
     bayes.splines.iteration(
       knots=lapply(1:length(groupList), function(i) { return (model.options$knots.positions.start); }), 
       Theta=Theta.init, betas.covariates=betaCovariate.init,
@@ -1493,11 +1714,14 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   #
   # Run the reversible jump MCMC
   #
-  for (i in 2:model.options$iterations) {
-    print(paste("ITER = ", i, sep=""))
+  iterations.saved.next = 1
+  for (i in 1:model.options$iterations) {
     
-    model.previous = modelIterationList[[i-1]]
-    # make a copy which will be modified as we move through the iteration
+    if (i %% model.options$print == 0) {
+      print(paste("Bayesian spline model iteration = ", i, sep=""))
+    }
+    
+    # make a copy of the previous iteration which will be modified as we move through the iteration
     model.current = model.previous
     
     for (group.index in 1:length(groupList)) {
@@ -1686,11 +1910,17 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     model.current$slope.dropoutSpecific = result
     
     # save the current iteration
-    modelIterationList[[i]] = model.current
+    model.previous = model.current
+    if ((i %% model.options$thin == 0 && i > model.options$burnin &&
+         iterations.saved.next <= length(modelIterationList)) || 
+        iterations.saved.next == length(modelIterationList)) {
+      modelIterationList[[iterations.saved.next]] = model.current
+      iterations.saved.next = iterations.saved.next + 1
+    }
   }
   
   # return the estimates, with distributions, and the model results from each iteration
-  return (modelIterationList)
+  return(dirichlet.fit(model.options, dist, groupList, covariates.var, modelIterationList))
   
 }
 

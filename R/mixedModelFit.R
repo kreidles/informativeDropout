@@ -49,6 +49,9 @@ informativeDropout.mixed <- function(data, ids.var, outcomes.var, groups.var,
     stop("Model options error :: options must be of type mixed.model.options")
   }
   
+  # get the coefficients for the knots
+  
+  
   if (dist == "gaussian") {
     fit = lme
   } else {

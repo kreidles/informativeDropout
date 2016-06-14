@@ -438,6 +438,21 @@ summary.dirichlet.fit <- function(fit) {
     row.names(covariate_effects) <- covariates.var
     result.summary$covariate_effects = covariate_effects
   }
+  
+  if (dist == "gaussian") {
+    sigma_error_sample = unlist(lapply(iterations, function(x) { 
+      return(x$sigma.error)
+    }))
+    sigma_error_result = data.frame(
+      mean = mean(sigma_error_sample),
+      median = median(sigma_error_sample),
+      ci_lower = quantile(sigma_error_sample, probs=0.025),
+      ci_upper = quantile(sigma_error_sample, probs=0.975)
+    )
+    row.names(sigma_error_result) = "sigma.error"
+    
+    result.summary$sigma.error = sigma_error_result
+  }
 
   return(result.summary)
   
@@ -486,8 +501,11 @@ plot.trace.dirichlet.fit <- function (fit, type="expectation", name="slope", gro
 
 # density plot for a parameter
 plot.density.dirichlet.fit <- function (fit, name="slope") {
-  
+  # take mean at each point across the iterations
+  # histogram the means
 }
+
+
 # plot the slope by dropout time
 plot.slopeByDropout.dirichlet.fit <- function (fit, group=1, xlim=NULL, ylim=NULL) {
 
@@ -713,7 +731,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   for (i in 1:model.options$iterations) {
     
     if (i %% model.options$print == 0) {
-      print(paste("ITER = ", i, sep=""))
+      print(paste("Dirichlet process model iteration = ", i, sep=""))
     }
    
     # make a copy of the previous iteration which will be modified as we move through the iteration

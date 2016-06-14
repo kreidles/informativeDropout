@@ -471,7 +471,7 @@ gaussian_1group_nocovar <- function() {
   method="bayes.splines"
   dist = "gaussian"
   
-  model.options <- bayes.splines.model.options(iterations=100, burnin=10, thin=NA,
+  model.options <- bayes.splines.model.options(iterations=100, burnin=10, thin=1,
                                                knots.prob.birth=0.2, knots.min=1, knots.max=10, 
                                                knots.stepSize=0.1,
                                                knots.positions.start=c(0,7/30,0.5, 23/30,1), 
@@ -491,7 +491,7 @@ gaussian_1group_nocovar <- function() {
   
   
   set.seed(1066) 
-  result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
+  fit = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
                               times.dropout.var, times.observation.var, 
                               method, dist, model.options)
   
@@ -559,7 +559,7 @@ binary_1group_nocovar <- function() {
   method="bayes.splines"
   dist = "binary"
   
-  model.options <- bayes.splines.model.options(iterations=50, burnin=0, thin=NA,
+  model.options <- bayes.splines.model.options(iterations=50, burnin=0, thin=1, print=1,
                                                knots.prob.birth=0.2, knots.min=1, knots.max=10, 
                                                knots.stepSize=0.1,
                                                knots.positions.start=c(0,7/30,0.5, 23/30,1), 
@@ -584,10 +584,10 @@ binary_1group_nocovar <- function() {
                               method, dist, model.options)
   
   
-  acceptanceProbability(result, "knot.add")
-  acceptanceProbability(result, "knot.remove")
-  acceptanceProbability(result, "knot.move")
-  acceptanceProbability(result, "fixedEffects")
+  prob.acceptance(result, "knot.add")
+  prob.acceptance(result, "knot.remove")
+  prob.acceptance(result, "knot.move")
+  prob.acceptance(result, "fixedEffects")
   #acceptanceProbability(result, "fixedEffectsCovariates")
   
   
