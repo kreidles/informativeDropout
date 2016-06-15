@@ -82,6 +82,36 @@ sensitivity <- function(x, ...) {
 }
 
 
+#' Fit a simple linear model to get initial values for regression
+#' coefficients associated with covariates
+#' 
+#' @param dist the distribution of the outcome ("gaussian" or "binary") 
+#' @param covariates date frame containing covariate values
+#' @param outcomes vector of outcomes
+#' 
+#' @export getInitialEstimatesCovariates
+#'
+getInitialEstimatesCovariates <- function(dist, covariates, outcomes) {
+  if (is.null(covariates) || ncol(covariates) == 0) {
+    return (NULL)
+  }
+  
+  data.covar = cbind(outcomes, covariates)
+  formula = as.formula(paste(c(paste(names(outcomes), "~"), 
+                               paste(names(covariates), collapse=" + ")), collapse=" "))
+  if (dist == 'gaussian') {
+    fit.beta <- lm(formula, data=data.covar)
+    return (as.vector(coef(fit.beta))[-1])
+  } else if (dist == 'binary') {
+    fit.beta <- glm(formula, family=binomial, data=data.covar)
+    return (as.vector(coef(fit.beta))[-1])
+  } else {
+    stop("unsupported distribution")
+  }
+}
+
+
+
 #' Fit a varying coefficient model for longitudinal studies with
 #' informative dropout. 
 #' 

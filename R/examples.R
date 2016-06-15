@@ -285,7 +285,7 @@ example.dp_binary_1group_covar <- function() {
   method="bayes.dirichlet"
   dist = "binary"
   
-  model.options=dirichlet.model.options(iterations=1000, n.clusters=15, burnin=0,
+  model.options=dirichlet.model.options(iterations=100, n.clusters=15, burnin=0,
                                         dropout.estimationTimes = seq(1/15,1,1/15),
                                         dp.concentration=1,
                                         dp.concentration.alpha=1,
@@ -301,7 +301,8 @@ example.dp_binary_1group_covar <- function() {
                                         dp.dist.sigma0.Tb = diag(3),
                                         betas.covariates = NULL,
                                         betas.covariates.mu = 0,
-                                        betas.covariates.sigma = matrix(0.7))
+                                        betas.covariates.sigma = matrix(0.7),
+                                        sigma.error = 1)
   
   
   set.seed(1066)
@@ -495,12 +496,8 @@ gaussian_1group_nocovar <- function() {
                               times.dropout.var, times.observation.var, 
                               method, dist, model.options)
   
-  
-  acceptanceProbability(result, "knot.add")
-  acceptanceProbability(result, "knot.remove")
-  acceptanceProbability(result, "knot.move")
-  acceptanceProbability(result, "fixedEffects")
-  #acceptanceProbability(result, "fixedEffectsCovariates")
+  summary(fit)
+
   
   
   nknots = unlist(lapply(result, function(x) { return(length(x$knots[[1]])) } ))
@@ -579,7 +576,7 @@ binary_1group_nocovar <- function() {
   
   
   set.seed(1066) 
-  result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
+  fit = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
                               times.dropout.var, times.observation.var, 
                               method, dist, model.options)
   

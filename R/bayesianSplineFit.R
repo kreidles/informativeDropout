@@ -870,7 +870,7 @@ updateFixedEffects.binary <- function(model.options, knots.previous,
   y.star <- XTheta.star + (y - prob.star) * (1 / (prob.star * (1 - prob.star)))
   weight.star <- Diagonal(x=prob.star * (1 - prob.star))
   covar.star <- as.matrix(nearPD(solve(covarIntThetaInverse + crossprod(X.previous, weight.star %*% X.previous)))$mat)
-  mu.star <- covar.star %*% (crossprod(XTheta.star, weight.star %*% y.star))
+  mu.star <- covar.star %*% (crossprod(X.previous, weight.star %*% y.star))
   
   # Metropolis hastings step
   rho <- (loglikelihood.star - loglikelihood.previous + 
@@ -1350,11 +1350,15 @@ calculateDropoutTimeSpecificSlope <- function(dropoutEstimationTimes, knotsByGro
   return(dropoutSpecificSlopes)
 }
 
-#'
-#'
-#'
-#'
-#'
+#' Fit a simple linear model to get initial values for regression
+#' coefficients associated with splines
+#' 
+#' @param dist the distribution of the outcome ("gaussian" or "binary") 
+#' @param covariates date frame containing covariate values
+#' @param outcomes vector of outcomes
+#' 
+#' @export getInitialEstimatesTheta
+#' 
 getInitialEstimatesTheta <- function(dist, groupList, X, outcomes) {
   data.theta = cbind(outcomes, X)
   formula = as.formula(paste(c(paste(names(outcomes), "~"), 
@@ -1372,30 +1376,6 @@ getInitialEstimatesTheta <- function(dist, groupList, X, outcomes) {
     return (lapply(1:length(groupList), function(i) {
       return (as.vector(coef(fit.Theta)))
     }))
-  }
-}
-
-#'
-#'
-#'
-#'
-#'
-getInitialEstimatesCovariates <- function(dist, covariates, outcomes) {
-  if (is.null(covariates) || ncol(covariates) == 0) {
-    return (NULL)
-  }
-  
-  data.covar = cbind(outcomes, covariates)
-  formula = as.formula(paste(c(paste(names(outcomes), "~"), 
-                               paste(names(covariates), collapse=" + ")), collapse=" "))
-  if (dist == 'gaussian') {
-    fit.beta <- lm(formula, data=data.covar)
-    return (as.vector(coef(fit.beta))[-1])
-  } else if (dist == 'binary') {
-    fit.beta <- glm(formula, family=binomial, data=data.covar)
-    return (as.vector(coef(fit.beta))[-1])
-  } else {
-    stop("unsupported distribution")
   }
 }
 
@@ -1450,32 +1430,34 @@ summary.bayes.splines.fit <- function(fit) {
   for (group.index in 1:length(groups)) {
     group = groups[group.index]
     
-    ## subject specific effects
-    # calculate mean, median, and 95% credible interval for the expected intercept
-    expected_slope_sample = unlist(lapply(iterations, function(x) { 
-      expected.slope = x$expected.slope[[group.index]]
-      return (ifelse(is.null(expected.slope), 0, expected.slope))
+    ## number of knots
+    knots_sample = unlist(lapply(iterations, function(x) { 
+      return(length(x$knots[[group.index]]))
     }))
-    # calculate mean, median, and 95% credible interval for the expected intercept
-    expected_intercept_sample = unlist(lapply(iterations, function(x) { 
-      expected.intercept = x$expected.intercept[[group.index]]
-      return (ifelse(is.null(expected.intercept), 0, expected.intercept))
-    }))
-    
-    subject_specific_effects = data.frame(
-      mean=c(mean(expected_slope_sample),mean(expected_intercept_sample)),
-      median=c(median(expected_slope_sample), median(expected_intercept_sample)),
-      ci_lower=c(quantile(expected_slope_sample, probs=0.025),
-                 quantile(expected_intercept_sample, probs=0.025)),
-      ci_upper=c(quantile(expected_slope_sample, probs=0.975),
-                 quantile(expected_intercept_sample, probs=0.975))
+    knots = data.frame(
+      mean=mean(knots_sample),
+      median=median(knots_sample),
+      ci_lower=quantile(knots_sample, probs=0.025),
+      ci_upper=quantile(knots_sample, probs=0.975)
     )
-    row.names(subject_specific_effects) = c("slope", "intercept")
+    row.names(knots) = c("knots")
+    
+    ## marginal slope
+    marginal_slope_sample = unlist(lapply(iterations, function(x) { 
+      slope = (x$slope.marginal[[group.index]])
+      return (ifelse(is.null(slope), 0, slope))
+    }))
+    marginal_slope = data.frame(
+      mean=mean(marginal_slope_sample),
+      median=median(marginal_slope_sample),
+      ci_lower=quantile(marginal_slope_sample, probs=0.025),
+      ci_upper=quantile(marginal_slope_sample, probs=0.975)
+    )
+    row.names(marginal_slope) = c("marginal slope")
     
     ## covariance parameters
-    param_list = c("dp.dist.mu0",           
-                   "dp.dist.sigma0", "dp.cluster.sigma",
-                   "dp.concentration")
+    param_list = c("sigma.residual","sigma.randomIntercept",
+                   "sigma.randomSlope", "sigma.randomInterceptSlope")
     covariance_parameters = data.frame(
       mean=numeric(length(param_list)),
       median=numeric(length(param_list)),
@@ -1505,7 +1487,10 @@ summary.bayes.splines.fit <- function(fit) {
     )
     for (time.index in 1:(length(model.options$dropout.estimationTimes))) {
       slope_sample <- unlist(lapply(iterations, function(x) { 
-        return(x$slope.dropoutTimes[[group.index]][time.index])
+        if (is.null(x$slope.dropoutSpecific)) {
+          return(0)
+        } 
+        return(x$slope.dropoutSpecific[[group.index]][time.index])
       }))
       slopes_by_dropout_time$mean[time.index] = mean(slope_sample)
       slopes_by_dropout_time$median[time.index] = median(slope_sample)
@@ -1516,8 +1501,8 @@ summary.bayes.splines.fit <- function(fit) {
     
     # build the summary list
     result.summary[[paste("group", group, sep="_")]] = list(
-      total_clusters = total_clusters,
-      subject_specific_effects = subject_specific_effects,
+      knots = knots,
+      marginal_slope = marginal_slope,
       covariance_parameters = covariance_parameters,
       slopes_by_dropout_time = slopes_by_dropout_time
     )
@@ -1544,6 +1529,7 @@ summary.bayes.splines.fit <- function(fit) {
   }
   
   if (dist == "gaussian") {
+    ## residual covariance parameters
     sigma_error_sample = unlist(lapply(iterations, function(x) { 
       return(x$sigma.error)
     }))
@@ -1561,11 +1547,11 @@ summary.bayes.splines.fit <- function(fit) {
   
   # calculate acceptance probability
   acceptance_probabilities = data.frame(probability=c(
-    prob.acceptance(result, "knot.add"),
-    prob.acceptance(result, "knot.remove"),
-    prob.acceptance(result, "knot.move"),
-    prob.acceptance(result, "fixedEffects"),
-    prob.acceptance(result, "fixedEffectsCovariates")
+    prob.acceptance(fit, "knot.add"),
+    prob.acceptance(fit, "knot.remove"),
+    prob.acceptance(fit, "knot.move"),
+    prob.acceptance(fit, "fixedEffects"),
+    prob.acceptance(fit, "fixedEffectsCovariates")
   ))
   row.names(acceptance_probabilities) = c(
     "knot.add", "knot.remove", "knot.move", "fixedEffects", "fixedEffectsCovariates"
@@ -1686,9 +1672,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     if (is.null(model.options$eta.null)) {
       eta.null = model.options$eta.null
     } else {
-      eta.null = lapply(subjectsPerGroup, function(N) {
-        return(logit(rep(sum(outcomes)/N, N)))
-      })
+      eta.null = logit(sum(outcomes)/length(outcomes))
     }
   }
   
@@ -1920,7 +1904,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   }
   
   # return the estimates, with distributions, and the model results from each iteration
-  return(dirichlet.fit(model.options, dist, groupList, covariates.var, modelIterationList))
+  return(bayes.splines.fit(model.options, dist, groupList, covariates.var, modelIterationList))
   
 }
 
