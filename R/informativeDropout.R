@@ -141,6 +141,8 @@ informativeDropout <- function(data, ids.var, outcomes.var, groups.var, covariat
     return (informativeDropout.mixed(data, ids.var, outcomes.var, groups.var, covariates.var, 
                                      times.dropout.var, times.observation.var, dist, 
                                      model.options))
+  } else {
+    stop(paste("Invalid method: ", method, sep=""))
   }
   
 }

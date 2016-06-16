@@ -874,9 +874,9 @@ updateFixedEffects.binary <- function(model.options, knots.previous,
   
   # Metropolis hastings step
   rho <- (loglikelihood.star - loglikelihood.previous + 
-            log(dmvnorm(as.vector(ct[[i]]), as.vector(mntstar), covtstar)) - 
-            log(dmvnorm(pbeta, as.vector(mnt),covt)) +
-            (crossprod(as.vector(ct[[i]])) - tcrossprod(pbeta))/ (2 * sigma.beta))
+            log(dmvnorm(Theta.previous, as.vector(mu.star), covar.star)) - 
+            log(dmvnorm(Theta.star, as.vector(mu),covar)) +
+            (crossprod(Theta.previous) - tcrossprod(Theta.star))/ (2 * sigma.beta))
   if (rho > log(runif(1))) {
     return (list(Theta=Theta.star, accepted=TRUE))
   } else {
@@ -1096,6 +1096,74 @@ updateRandomEffects.binary <- function(numSubjects, numObservations, firstObsPer
                                        Z, alpha, betaCovariates,  
                                        sigma.randomIntercept, sigma.randomSlope,
                                        sigma.randomInterceptSlope) {
+  
+  
+  # grab the relevant model options
+  sigma.beta <- model.options$sigma.beta
+  
+  # make sure there are covariates to update 
+  if (is.null(covariates)) {
+    return (list(betaCovariates=NULL, accepted=FALSE))
+  }
+  
+  # build components of eta
+  y <- as.matrix(outcomes)
+  C = as.matrix(covariates)
+  cBeta = as.vector(C %*% betaCovariates.previous)
+  zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
+  XTheta.previous = X.previous %*% Theta.previous 
+  # calculate the previous eta and associated probability
+  eta.previous = as.vector(XTheta.previous + cBeta + zAlpha)
+  prob.previous = inv.logit(eta.previous)
+  # adjust probabilities within tolerance levels
+  prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
+  prob.previous[prob.previous < model.options$prob.max] <-  model.options$prob.max
+  loglikelihood.previous <- sum(log((1 - prob.previous[y==0]))) + sum(log(prob.previous[y==1]))    
+  
+  # create the covariance matrix for the intercept and theta coefficients for the splines - R0
+  covarIntTheta <- diag(rep(sigma.beta, (length(knots.previous)+1))) 
+  covarIntThetaInverse <- diag(rep(1/sigma.beta, (length(knots.previous)+1))) 
+  # build y-tilde
+  yt = cBeta + (y - prob.previous) * (1 / (prob.previous * (1 - prob.previous)))
+  # build the weight matrix
+  weight <- Diagonal(x = prob.previous * (1-prob.previous))
+  # build the covariance of the beta coefficients and make sure it is positive definite
+  covar <- as.matrix(nearPD(solve(covarIntThetaInverse + crossprod(C, weight %*% C)))$mat)
+  # build the mean
+  mu <- covar  %*% (crossprod(C, weight %*% yt))
+  # draw the proposed coefficients for the fixed effects
+  betaCovariates.star <- rmvnorm(1, mu, covar)
+  
+  # get proposal probabilities
+  eta.star <- XTheta.previous + C %*% betaCovariates.star + zAlpha
+  prob.star = inv.logit(eta.star)
+  # adjust probabilities within tolerance levels
+  prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
+  prob.star[prob.star < model.options$prob.max] <-  model.options$prob.max
+  loglikelihood.star <- sum(log((1 - prob.star[y == 0]))) + sum(log(prob.star[y == 1]))    
+  
+  y.star <- cBeta.star + (y - prob.star) * (1 / (prob.star * (1 - prob.star)))
+  weight.star <- Diagonal(x=prob.star * (1 - prob.star))
+  covar.star <- as.matrix(nearPD(solve(covarIntThetaInverse + crossprod(C, weight.star %*% C)))$mat)
+  mu.star <- covar.star %*% (crossprod(C,weight.star%*%y.star))
+  
+  # Metropolis hastings step
+  rho <- (loglikelihood.star - loglikelihood.previous + 
+            log(dmvnorm(as.vector(betaCovariates.star), as.vector(mu.star), covar.star)) - 
+            log(dmvnorm(pbeta, as.vector(mnt),covt)) +
+            (crossprod(as.vector(betaCovariates.star)) - tcrossprod(prob.star))/ (2 * sigma.beta))
+  
+  if (rho > log(runif(1))) {
+    return (list(betaCovariates=as.vector(betaCovariates.star), accepted=TRUE))
+  } else {
+    return (list(betaCovariates=betaCovariates.previous, accepted=FALSE))
+  }
+  
+  
+  
+  
+  
+  
   
   # Update B1 and B2 using MH step
   

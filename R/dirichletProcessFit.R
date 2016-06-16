@@ -561,7 +561,6 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
                                                covariates.var, 
                                                times.dropout.var, times.observation.var, 
                                                dist, model.options) {
-  
   # make sure we have the correct type of mcmc opts
   if (!is(model.options,"dirichlet.model.options")) {
     stop("Model options error :: options must be of type dirichlet.model.options")
@@ -703,6 +702,8 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   # for Gaussian outcomes, the residual error
   if (dist == "gaussian") {
     sigma.error = model.options$sigma.error
+  } else {
+    sigma.error = NULL
   }
   
   # initialize the first model iteration
@@ -1094,8 +1095,8 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       slopes = c(slopes, rep(model.current$betas[[group.index]][,2], 
                              nobj.perGroup[[group.index]]))
     }
-    
-    # update fixed effects associated with covariates
+
+        # update fixed effects associated with covariates
     if (!is.null(covariates.var)) {
       if (dist == "gaussian") {
         sigma.error.inv = 1/model.current$sigma.error
@@ -1110,8 +1111,8 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       } else {
         # binary case, need to do metropolis hastings
         # build components of eta
-        y <- as.matrix(outcomes)
-        C = as.matrix(covariates)
+        y <- as.matrix(data[, outcomes.var])
+        C = as.matrix(data[,covariates.var])
         cBeta = as.vector(C %*% model.current$betas.covariates)
         XTheta.previous = intercepts + slopes * data[, times.observation.var]
         # calculate the previous eta and associated probability

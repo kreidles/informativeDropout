@@ -12,8 +12,8 @@
 #
 dp_gaussian_2group_covar <- function() {
   data <- read.csv("../data/macs4sarah.csv")
-  model.options=dirichlet.model.options(iterations=500, n.clusters=60, burnin=0, thin=1,
-                                        print=20,
+  model.options=dirichlet.model.options(iterations=100, n.clusters=60, burnin=0, thin=1,
+                                        print=1,
                                         dropout.offset=0,
                                         dropout.estimationTimes = seq(2,13,1),
                                         dp.concentration=1,
@@ -35,34 +35,26 @@ dp_gaussian_2group_covar <- function() {
                                         sigma.error.tau = 0.001)
   
   data$dropouttime = exp(data$logdropouttime)
-
+  
   ids.var="CASEID"
   outcomes.var="logcd4"
   groups.var="hard"
   covariates.var=c("logbase", "basebytime") 
   times.dropout.var="dropouttime"
   times.observation.var='time'
+  method="dirichlet"
   dist='gaussian'
   
   set.seed(1066)
-  fit = informativeDropout.bayes.dirichlet(data, ids.var, 
-                                              outcomes.var, groups.var,
-                                              covariates.var, 
-                                              times.dropout.var, times.observation.var,
-                                              dist, model.options)
+  fit = informativeDropout(data, ids.var, 
+                           outcomes.var, groups.var,
+                           covariates.var, 
+                           times.dropout.var, times.observation.var,
+                           method, dist, model.options)
+  
+  summary(fit)
   
 }
-#
-# Dirichlet process model examples corresponding to the vignettes
-#
-
-gendata.gaussian_1group_nocovar <- function() {
-  
-}
-
-
-
-
 
 
 example.dp_gaussian_1group_nocovar <- function() {
@@ -72,18 +64,18 @@ example.dp_gaussian_1group_nocovar <- function() {
   names(data) <- c("patid", "alpha", "drptm", "b1", "b2",
                    "b2ui", "b2uii", "b2uiii", "t", "e", "yi", "yii", "yiii")
   data$group <- rep(1,nrow(data))
-  data$logdrptm <- log(data$drptm + 1/15)
+  data$drop <- data$drptm + 1/15
   # for debugging
   ids.var = "patid"
   outcomes.var = "yi"
   groups.var = "group"
   covariates.var = NULL
-  times.dropout.var = "logdrptm"
+  times.dropout.var = "drop"
   times.observation.var = "t"
-  method="bayes.dirichlet"
+  method="dirichlet"
   dist = "gaussian"
   
-  model.options=dirichlet.model.options(iterations=5000, n.clusters=15, burnin=0,
+  model.options=dirichlet.model.options(iterations=100, n.clusters=15, burnin=0,
                                         dropout.estimationTimes = seq(1/15,1,1/15),
                                         dp.concentration=1,
                                         dp.concentration.alpha=1,
@@ -105,63 +97,14 @@ example.dp_gaussian_1group_nocovar <- function() {
   
   
   set.seed(1066)
-  result = informativeDropout.bayes.dirichlet(data, ids.var, 
-                                              outcomes.var, groups.var,
-                                              covariates.var, 
-                                              times.dropout.var, times.observation.var,
-                                              dist, model.options)
-  #   result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
-  #                               times.dropout.var, times.observation.var, 
-  #                               method, dist,
-  #                               knots.options = knots.options, 
-  #                               mcmc.options = mcmc.options,
-  #                               model.options = model.options,
-  #                               dropoutEstimationTimes = dropoutEstimationTimes)
-  #   
-  #   
-  #   acceptanceProbability(result, "knot.add")
-  #   acceptanceProbability(result, "knot.remove")
-  #   acceptanceProbability(result, "knot.move")
-  #   acceptanceProbability(result, "fixedEffects")
-  #   #acceptanceProbability(result, "fixedEffectsCovariates")
-  #   
-  #   
-  #   nknots = unlist(lapply(result, function(x) { return(length(x$knots[[1]])) } ))
-  #   ts.plot(nknots)
-  #   summary(nknots)
-  #   
-  #   slopes = unlist(lapply(result, function(x) { return(x$slope.marginal[[1]]) }))
-  #   summary(slopes)
-  #   ts.plot(slopes)
-  #   
-  #   sum.sigma.error = unlist(lapply(result, function(x) { return(x$sigma.error) }))
-  #   summary(sum.sigma.error)
-  #   ts.plot(sum.sigma.error)
-  #   
-  #   sum.sigma.randomIntercept = unlist(lapply(result, function(x) { return(x$sigma.randomIntercept) }))
-  #   summary(sum.sigma.randomIntercept)
-  #   ts.plot(sum.sigma.randomIntercept)
-  #   
-  #   sum.sigma.randomSlope = unlist(lapply(result, function(x) { return(x$sigma.randomSlope) }))
-  #   summary(sum.sigma.randomSlope)
-  #   ts.plot(sum.sigma.randomSlope)
-  #   
-  #   sum.sigma.randomInterceptSlope = unlist(lapply(result, function(x) { return(x$sigma.randomInterceptSlope) }))
-  #   summary(sum.sigma.randomInterceptSlope)
-  #   ts.plot(sum.sigma.randomInterceptSlope)
-  #   
-  #   
-  #   dropout.slopes1 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][1])}))
-  #   summary(dropout.slopes1)
-  #   ts.plot(dropout.slopes1)
-  #   
-  #   dropout.slopes2 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][2])}))
-  #   summary(dropout.slopes2)
-  #   ts.plot(dropout.slopes2)
-  #   
-  #   dropout.slopes3 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][3])}))
-  #   summary(dropout.slopes3)
-  #   ts.plot(dropout.slopes3)
+  fit = informativeDropout(data, ids.var, 
+                           outcomes.var, groups.var,
+                           covariates.var, 
+                           times.dropout.var, times.observation.var,
+                           method, dist, model.options)
+  
+  summary(fit)
+  
 }
 
 
@@ -174,17 +117,19 @@ example.dp_binary_1group_nocovar <- function() {
                    "b2ui", "b2uii", "b2uiii", "t", "e", "yi", "yii", "yiii")
   data$group <- rep(1,nrow(data))
   data$yi_bin = (data$yi> 0)
+  data$drop <- data$drptm + 1/15
+  
   # for debugging
   ids.var = "patid"
   outcomes.var = "yi_bin"
   groups.var = "group"
   covariates.var = NULL
-  times.dropout.var = "drptm"
+  times.dropout.var = "drop"
   times.observation.var = "t"
-  method="bayes.dirichlet"
+  method="dirichlet"
   dist = "binary"
   
-  model.options=dirichlet.model.options(iterations=1000, n.clusters=15, burnin=0,
+  model.options=dirichlet.model.options(iterations=100, n.clusters=15, burnin=0,
                                         dropout.estimationTimes = seq(1/15,1,1/15),
                                         dp.concentration=1,
                                         dp.concentration.alpha=1,
@@ -200,71 +145,23 @@ example.dp_binary_1group_nocovar <- function() {
                                         dp.dist.sigma0.Tb = diag(3),
                                         betas.covariates = NULL,
                                         betas.covariates.mu = NULL,
-                                        betas.covariates.sigma = NULL)
+                                        betas.covariates.sigma = NULL,
+                                        sigma.error.tau=0.01)
   
   
   set.seed(1066)
-  result = informativeDropout.bayes.dirichlet(data, ids.var, 
-                                              outcomes.var, groups.var,
-                                              covariates.var, 
-                                              times.dropout.var, times.observation.var,
-                                              dist, model.options)
-  #   result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
-  #                               times.dropout.var, times.observation.var, 
-  #                               method, dist,
-  #                               knots.options = knots.options, 
-  #                               mcmc.options = mcmc.options,
-  #                               model.options = model.options,
-  #                               dropoutEstimationTimes = dropoutEstimationTimes)
-  #   
-  #   
-  #   acceptanceProbability(result, "knot.add")
-  #   acceptanceProbability(result, "knot.remove")
-  #   acceptanceProbability(result, "knot.move")
-  #   acceptanceProbability(result, "fixedEffects")
-  #   #acceptanceProbability(result, "fixedEffectsCovariates")
-  #   
-  #   
-  #   nknots = unlist(lapply(result, function(x) { return(length(x$knots[[1]])) } ))
-  #   ts.plot(nknots)
-  #   summary(nknots)
-  #   
-  #   slopes = unlist(lapply(result, function(x) { return(x$slope.marginal[[1]]) }))
-  #   summary(slopes)
-  #   ts.plot(slopes)
-  #   
-  #   sum.sigma.error = unlist(lapply(result, function(x) { return(x$sigma.error) }))
-  #   summary(sum.sigma.error)
-  #   ts.plot(sum.sigma.error)
-  #   
-  #   sum.sigma.randomIntercept = unlist(lapply(result, function(x) { return(x$sigma.randomIntercept) }))
-  #   summary(sum.sigma.randomIntercept)
-  #   ts.plot(sum.sigma.randomIntercept)
-  #   
-  #   sum.sigma.randomSlope = unlist(lapply(result, function(x) { return(x$sigma.randomSlope) }))
-  #   summary(sum.sigma.randomSlope)
-  #   ts.plot(sum.sigma.randomSlope)
-  #   
-  #   sum.sigma.randomInterceptSlope = unlist(lapply(result, function(x) { return(x$sigma.randomInterceptSlope) }))
-  #   summary(sum.sigma.randomInterceptSlope)
-  #   ts.plot(sum.sigma.randomInterceptSlope)
-  #   
-  #   
-  #   dropout.slopes1 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][1])}))
-  #   summary(dropout.slopes1)
-  #   ts.plot(dropout.slopes1)
-  #   
-  #   dropout.slopes2 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][2])}))
-  #   summary(dropout.slopes2)
-  #   ts.plot(dropout.slopes2)
-  #   
-  #   dropout.slopes3 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][3])}))
-  #   summary(dropout.slopes3)
-  #   ts.plot(dropout.slopes3)
+  fit = informativeDropout(data, ids.var, 
+                           outcomes.var, groups.var,
+                           covariates.var, 
+                           times.dropout.var, times.observation.var,
+                           method, dist, model.options)
+  
+  summary(fit)
+  
 }
 
 example.dp_binary_1group_covar <- function() {
-  data <- read.table("../Rnsv/code/sim_sml_1.dat")
+  data <- read.table("../../Rnsv/code/sim_sml_1.dat")
   #data$day = data$years * 365
   
   names(data) <- c("patid", "alpha", "drptm", "b1", "b2",
@@ -272,6 +169,8 @@ example.dp_binary_1group_covar <- function() {
   data$group <- rep(1,nrow(data))
   data$yi_bin = (data$yi> 0)
   data$gender = data$yi_bin
+  data$drop <- data$drptm + 1/15
+  
   data$gender[data$yi_bin == 1] <- as.numeric(runif(length(data$yi_bin[data$yi_bin == 1])) > 0.8)
   data$gender[data$yi_bin == 0] <- as.numeric(runif(length(data$yi_bin[data$yi_bin == 0])) > 0.15)
   
@@ -280,9 +179,9 @@ example.dp_binary_1group_covar <- function() {
   outcomes.var = "yi_bin"
   groups.var = "group"
   covariates.var = "gender"
-  times.dropout.var = "drptm"
+  times.dropout.var = "drop"
   times.observation.var = "t"
-  method="bayes.dirichlet"
+  method="dirichlet"
   dist = "binary"
   
   model.options=dirichlet.model.options(iterations=100, n.clusters=15, burnin=0,
@@ -302,33 +201,37 @@ example.dp_binary_1group_covar <- function() {
                                         betas.covariates = NULL,
                                         betas.covariates.mu = 0,
                                         betas.covariates.sigma = matrix(0.7),
-                                        sigma.error = 1)
+                                        sigma.error.tau = 0.01)
   
   
   set.seed(1066)
-  result = informativeDropout.bayes.dirichlet(data, ids.var, 
-                                              outcomes.var, groups.var,
-                                              covariates.var, 
-                                              times.dropout.var, times.observation.var,
-                                              dist, model.options)
+  fit = informativeDropout(data, ids.var, 
+                           outcomes.var, groups.var,
+                           covariates.var, 
+                           times.dropout.var, times.observation.var,
+                           method, dist, model.options)
+  
+  summary(fit)
 }
 
 
 runExamples <- function() {
-  data <- read.table("../Rnsv/code/sim_sml_1.dat")
+  data <- read.table("../../Rnsv/code/sim_sml_1.dat")
   #data$day = data$years * 365
   
   names(data) <- c("patid", "alpha", "drptm", "b1", "b2",
                    "b2ui", "b2uii", "b2uiii", "t", "e", "yi", "yii", "yiii")
   data$group <- rep(1,nrow(data))
+  data$drop <- data$drptm + 1/15
+  
   # for debugging
   ids.var = "patid"
   outcomes.var = "yi"
   groups.var = "group"
   covariates.var = NULL
-  times.dropout.var = "drptm"
+  times.dropout.var = "drop"
   times.observation.var = "t"
-  method="bayes.dirichlet"
+  method="dirichlet"
   dist = "gaussian"
   
   model.options=dirichlet.model.options(iterations=5000, n.clusters=15, burnin=0,
@@ -353,63 +256,13 @@ runExamples <- function() {
   
   
   set.seed(1066)
-  result = informativeDropout.bayes.dirichlet(data, ids.var, 
+  fit = informativeDropout(data, ids.var, 
                                               outcomes.var, groups.var,
                                               covariates.var, 
                                               times.dropout.var, times.observation.var,
-                                              dist, model.options)
-  #   result = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
-  #                               times.dropout.var, times.observation.var, 
-  #                               method, dist,
-  #                               knots.options = knots.options, 
-  #                               mcmc.options = mcmc.options,
-  #                               model.options = model.options,
-  #                               dropoutEstimationTimes = dropoutEstimationTimes)
-  #   
-  #   
-  #   acceptanceProbability(result, "knot.add")
-  #   acceptanceProbability(result, "knot.remove")
-  #   acceptanceProbability(result, "knot.move")
-  #   acceptanceProbability(result, "fixedEffects")
-  #   #acceptanceProbability(result, "fixedEffectsCovariates")
-  #   
-  #   
-  #   nknots = unlist(lapply(result, function(x) { return(length(x$knots[[1]])) } ))
-  #   ts.plot(nknots)
-  #   summary(nknots)
-  #   
-  #   slopes = unlist(lapply(result, function(x) { return(x$slope.marginal[[1]]) }))
-  #   summary(slopes)
-  #   ts.plot(slopes)
-  #   
-  #   sum.sigma.error = unlist(lapply(result, function(x) { return(x$sigma.error) }))
-  #   summary(sum.sigma.error)
-  #   ts.plot(sum.sigma.error)
-  #   
-  #   sum.sigma.randomIntercept = unlist(lapply(result, function(x) { return(x$sigma.randomIntercept) }))
-  #   summary(sum.sigma.randomIntercept)
-  #   ts.plot(sum.sigma.randomIntercept)
-  #   
-  #   sum.sigma.randomSlope = unlist(lapply(result, function(x) { return(x$sigma.randomSlope) }))
-  #   summary(sum.sigma.randomSlope)
-  #   ts.plot(sum.sigma.randomSlope)
-  #   
-  #   sum.sigma.randomInterceptSlope = unlist(lapply(result, function(x) { return(x$sigma.randomInterceptSlope) }))
-  #   summary(sum.sigma.randomInterceptSlope)
-  #   ts.plot(sum.sigma.randomInterceptSlope)
-  #   
-  #   
-  #   dropout.slopes1 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][1])}))
-  #   summary(dropout.slopes1)
-  #   ts.plot(dropout.slopes1)
-  #   
-  #   dropout.slopes2 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][2])}))
-  #   summary(dropout.slopes2)
-  #   ts.plot(dropout.slopes2)
-  #   
-  #   dropout.slopes3 = unlist(lapply(result, function(x) { return(x$slope.dropoutSpecific[[1]][3])}))
-  #   summary(dropout.slopes3)
-  #   ts.plot(dropout.slopes3)
+                                              method, dist, model.options)
+  
+  summary(fit)
 }
 
 
@@ -493,11 +346,11 @@ gaussian_1group_nocovar <- function() {
   
   set.seed(1066) 
   fit = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
-                              times.dropout.var, times.observation.var, 
-                              method, dist, model.options)
+                           times.dropout.var, times.observation.var, 
+                           method, dist, model.options)
   
   summary(fit)
-
+  
   
   
   nknots = unlist(lapply(result, function(x) { return(length(x$knots[[1]])) } ))
@@ -546,12 +399,13 @@ binary_1group_nocovar <- function() {
                    "b2ui", "b2uii", "b2uiii", "t", "e", "yi", "yii", "yiii")
   data$group <- rep(1,nrow(data))
   data$y_bin <- as.numeric(data$yiii > 0)
+  data$drop <- data$drptm + 1/15
   # for debugging
   ids.var = "patid"
   outcomes.var = "y_bin"
   groups.var = "group"
   covariates.var = NULL
-  times.dropout.var = "drptm"
+  times.dropout.var = "drop"
   times.observation.var = "t"
   method="bayes.splines"
   dist = "binary"
@@ -576,9 +430,10 @@ binary_1group_nocovar <- function() {
   
   
   set.seed(1066) 
-  fit = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
-                              times.dropout.var, times.observation.var, 
-                              method, dist, model.options)
+  fit = informativeDropout.bayes.splines(data, ids.var, outcomes.var, groups.var, covariates.var, 
+                           times.dropout.var, times.observation.var, 
+                           dist, model.options)
+  summary(fit)
   
   
   prob.acceptance(result, "knot.add")
