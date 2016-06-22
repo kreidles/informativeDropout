@@ -111,6 +111,7 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
 #' @param burnin burn in period for the simulation, i.e. the number of 
 #' iterations to throw away at the beginning of the simulation
 #' @param thin thinning interval, i.e. if thin=n, only keep every nth iteration
+#' @param print printing interval, i.e. if print=n, print a counter on every nth iteration
 #' @param numClusters number of clusters for the Dirichlet Process stick breaking model
 #' @param dp.concentration prior value for the concentration parameter of the Dirichlet process
 #' @param dp.concentration.alpha Shape parameter for the hyperprior Gamma distribution of the
@@ -136,6 +137,8 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
 #' @param betas.covariates.mu Prior mean for the covariate regression coefficients
 #' @param betas.covariates.sigma Prior covariance for the covariate regression coefficients
 #' @param sigma.error Prior for the residual error (Gaussian outcomes only)
+#' 
+#' @importFrom matrixcalc is.positive.definite
 #' 
 #' @export dirichlet.model.options
 #' 
@@ -555,7 +558,11 @@ sensitivity.slope <- function(x, ...) {
 #' @param dist the distribution of the outcome, valid values are "gaussian" or "binary"
 #' @param model.options model options (see dirichlet.model.options for details)
 #'
-#' @export
+#' @importFrom MCMCpack riwish
+#' @importFrom gtools inv.logit
+#' @importFrom Matrix Diagonal nearPD
+#'
+#' @export informativeDropout.bayes.dirichlet
 #'
 informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, groups.var, 
                                                covariates.var, 

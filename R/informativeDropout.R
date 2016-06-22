@@ -22,17 +22,17 @@
 #
 #####################################################################
 
-library(matrixcalc)
-library(splines)
-library(MASS)
-library(Matrix)
-library(nlme)
-library(lme4)
-library(mvtnorm)
-library(MCMCpack)
-library(gtools)
-library(abind)
-library(Hmisc)
+# library(matrixcalc)
+# library(splines)
+# library(MASS)
+# library(Matrix)
+# library(nlme)
+# library(lme4)
+# library(mvtnorm)
+# library(MCMCpack)
+# library(gtools)
+# library(abind)
+# library(Hmisc)
 
 #'
 #' Single iteration of weighted least squares

@@ -1096,103 +1096,67 @@ updateRandomEffects.binary <- function(numSubjects, numObservations, firstObsPer
                                        Z, alpha, betaCovariates,  
                                        sigma.randomIntercept, sigma.randomSlope,
                                        sigma.randomInterceptSlope) {
-  
-  
-  # grab the relevant model options
-  sigma.beta <- model.options$sigma.beta
-  
-  # make sure there are covariates to update 
-  if (is.null(covariates)) {
-    return (list(betaCovariates=NULL, accepted=FALSE))
-  }
-  
-  # build components of eta
+
+  # Update B1 and B2 using MH step
+  # get previous log likelihood
   y <- as.matrix(outcomes)
   C = as.matrix(covariates)
-  cBeta = as.vector(C %*% betaCovariates.previous)
-  zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
-  XTheta.previous = X.previous %*% Theta.previous 
+  if (!is.null(covariates)) {
+    cBeta = as.vector(C %*% betaCovariates)
+  }
+  XTheta = X %*% Theta
+  zAlpha.previous = Z[,1] * alpha[,1] + Z.onePerSubject[,2] * alpha[,2]
   # calculate the previous eta and associated probability
-  eta.previous = as.vector(XTheta.previous + cBeta + zAlpha)
+  eta.previous = as.vector(XTheta + ifelse(!is.null(covariates), cBeta, 0) + zAlpha.previous)
   prob.previous = inv.logit(eta.previous)
   # adjust probabilities within tolerance levels
   prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
   prob.previous[prob.previous < model.options$prob.max] <-  model.options$prob.max
   loglikelihood.previous <- sum(log((1 - prob.previous[y==0]))) + sum(log(prob.previous[y==1]))    
   
-  # create the covariance matrix for the intercept and theta coefficients for the splines - R0
-  covarIntTheta <- diag(rep(sigma.beta, (length(knots.previous)+1))) 
-  covarIntThetaInverse <- diag(rep(1/sigma.beta, (length(knots.previous)+1))) 
-  # build y-tilde
-  yt = cBeta + (y - prob.previous) * (1 / (prob.previous * (1 - prob.previous)))
-  # build the weight matrix
-  weight <- Diagonal(x = prob.previous * (1-prob.previous))
-  # build the covariance of the beta coefficients and make sure it is positive definite
-  covar <- as.matrix(nearPD(solve(covarIntThetaInverse + crossprod(C, weight %*% C)))$mat)
-  # build the mean
-  mu <- covar  %*% (crossprod(C, weight %*% yt))
-  # draw the proposed coefficients for the fixed effects
-  betaCovariates.star <- rmvnorm(1, mu, covar)
-  
-  # get proposal probabilities
-  eta.star <- XTheta.previous + C %*% betaCovariates.star + zAlpha
+  ### Get the proposal log likelihood by drawing a candidate from a symmetric random walk proposal
+  # get the random intercepts, one per subject
+  alpha.onePerSubject = alpha[firstObsPerSubject,]
+  noise <- rmvt(nrow(alpha.onePerSubject),sigma=diag(2),3) # TODO: why df=3??? or b+rmvnorm(n,sigma=Sigma)
+  # get the proposed random effects
+  alpha.star.intercept <- alpha.onePerSubject[,1] + noise[,1]
+  alpha.star.slope <- alpha.onePerSubject[,2] + noise[,2]
+  # calculate the proposal log likelihood
+  zAlpha.star = Z[,1] * rep(alpha.star.intercept, numObservations) + 
+    Z.onePerSubject[,2] * rep(alpha.star.slope, numObservations)
+  # calculate the previous eta and associated probability
+  eta.star = as.vector(XTheta + ifelse(!is.null(covariates), cBeta, 0) + zAlpha.star)
   prob.star = inv.logit(eta.star)
   # adjust probabilities within tolerance levels
   prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
   prob.star[prob.star < model.options$prob.max] <-  model.options$prob.max
-  loglikelihood.star <- sum(log((1 - prob.star[y == 0]))) + sum(log(prob.star[y == 1]))    
-  
-  y.star <- cBeta.star + (y - prob.star) * (1 / (prob.star * (1 - prob.star)))
-  weight.star <- Diagonal(x=prob.star * (1 - prob.star))
-  covar.star <- as.matrix(nearPD(solve(covarIntThetaInverse + crossprod(C, weight.star %*% C)))$mat)
-  mu.star <- covar.star %*% (crossprod(C,weight.star%*%y.star))
-  
-  # Metropolis hastings step
-  rho <- (loglikelihood.star - loglikelihood.previous + 
-            log(dmvnorm(as.vector(betaCovariates.star), as.vector(mu.star), covar.star)) - 
-            log(dmvnorm(pbeta, as.vector(mnt),covt)) +
-            (crossprod(as.vector(betaCovariates.star)) - tcrossprod(prob.star))/ (2 * sigma.beta))
-  
-  if (rho > log(runif(1))) {
-    return (list(betaCovariates=as.vector(betaCovariates.star), accepted=TRUE))
-  } else {
-    return (list(betaCovariates=betaCovariates.previous, accepted=FALSE))
-  }
+  loglikelihood.star <- sum(log((1 - prob.star[y==0]))) + sum(log(prob.star[y==1]))  
   
   
+  sigma.alpha = matrix(c(sigma.randomIntercept, 
+                         sigma.randomInterceptSlope, 
+                         sigma.randomInterceptSlope, 
+                         sigma.randomSlope), nrow=2, byrow=TRUE)
+  alpha.star.onePerSubject = cbind(alpha.star.intercept, alpha.star.intercept)
+  ratio <- (
+    tapply(loglikelihood.star, ids, sum) +
+    dmvnorm(alpha.star.onePerSubject, c(0,0), sigma.alpha, log=TRUE) - 
+      (tapply(loglikelihood.previous, ids, sum) + 
+         dmvnorm(alpha.onePerSubject, c(0,0), sigma.alpha, log=TRUE))
+  )
   
+  update <- 1*(log(runif(numSubjects)) < ratio)
+  randomIntercepts <- alpha.onePerSubject[,1]
+  randomIntercepts[update == 1] <- alpha.star.intercept[update==1]
+  randomSlopes <- alpha.onePerSubject[,2]
+  randomSlopes[update == 1] <- alpha.star.slope[update==1]
   
+  # build the new random effects matrix
+  alpha.total = data.frame(intercept=randomIntercepts, slope=randomSlopes)
+  alpha = alpha.total[rep(seq_len(nrow(alpha.total)), numObservations),]
+  # expand back out to complete alpha matrix
+  return (alpha)
   
-  
-  
-  # Update B1 and B2 using MH step
-  
-  l<-ls<-rep(0,nsub)   # store subject-level log-likes
-  
-  # Current Observation-Level Log-Likelihood
-  Lt<-Lstar<-rep(0, N)
-  Lt[y==0]<-log(1-pt[y==0])  
-  Lt[y==1]<-log(pt[y==1])
-  # Draw Candidate from Symmetric Rand Walk Proposal 
-  bs<-cbind(B1,B2)+rmvt(nsub,sigma=diag(2),3)      # or b+rmvnorm(n,sigma=Sigma)
-  etastar<-Xt%*%c(ct[[i]])+rep(bs[,1],nobs)+rep(bs[,2],nobs)*t  
-  pstar<-inv.logit(etastar)
-  pstar[pstar<0.00001]<-0.00001
-  pstar[pstar>0.99999]<-0.99999
-  Lstar[y==0]<-log(1-pstar[y==0])
-  Lstar[y==1]<-log(pstar[y==1])
-  # Subject-Level Log-Likelihood
-  l<-tapply(Lt,patid,sum)
-  ls<-tapply(Lstar, patid, sum)
-  
-  ratio<-ls+dmvnorm(bs,c(0,0),matrix((Sigma.bs[i-1,]), nrow=2, ncol=2),log=TRUE)-(l+dmvnorm(cbind(B1,B2),c(0,0),matrix((Sigma.bs[i-1,]), nrow=2, ncol=2),log=TRUE))
-  
-  un<-1*(log(runif(nsub))<ratio)
-  B1[un==1]<-bs[un==1,1]
-  B2[un==1]<-bs[un==1,2]
-  etat<-Xt%*%c(ct[[i]])+rep(B1,nobs)+rep(B2,nobs)*t 
-  pt<-inv.logit(etat)
-  loglt<-sum(log((1-pt[y==0])))+sum(log(pt[y==1]))
 }
 
 
@@ -1354,6 +1318,12 @@ updateCovarianceParameters.gaussian <- function(model.options, totalObservations
 #'
 #' Calculate the marginal slope at the given iteration
 #'
+#' @param knotsByGroup list of knots by group
+#' @param ThetaByGroup list of spline coefficients by group
+#' @param subjectsPerGroup list of number of subjects by group
+#' @param times.dropout dropout times
+#' 
+#' @importFrom splines ns
 #'
 calculateMarginalSlope <- function(knotsByGroup, ThetaByGroup, subjectsPerGroup,
                                    times.dropout) {
@@ -1389,7 +1359,18 @@ calculateMarginalSlope <- function(knotsByGroup, ThetaByGroup, subjectsPerGroup,
   return(marginal)
 }
 
-
+#'
+#' Calculate the estimated slope at the given dropout times
+#' 
+#' @param dropoutEstimationTimes list of times at which to estimate the slope
+#' @param knotsByGroup list of knots by group
+#' @param ThetaByGroup list of spline coefficients by group
+#' @param subjectsPerGroup list of number of subjects by group
+#' @param times.observation observation times
+#' @param times.dropout dropout times
+#' 
+#' @importFrom splines ns
+#'
 calculateDropoutTimeSpecificSlope <- function(dropoutEstimationTimes, knotsByGroup, ThetaByGroup, 
                                               subjectsPerGroup,
                                               times.observation, times.dropout) {
@@ -1647,7 +1628,11 @@ summary.bayes.splines.fit <- function(fit) {
 #' @param times.observation.var column of the data set containing observation times
 #' @param dist distribution of the outcome (either "gaussian" or "binary")
 #' @param model.options the bayes.spines.model.options object (@@seealso bayes.spines.model.options)
-#' 
+#'  
+#' @importFrom splines ns
+#' @importFrom abind abind
+#' @importFrom gtools logit
+#'
 #' @export informativeDropout.bayes.splines
 #' 
 informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups.var, 

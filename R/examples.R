@@ -353,11 +353,11 @@ gaussian_1group_nocovar <- function() {
   
   
   
-  nknots = unlist(lapply(result, function(x) { return(length(x$knots[[1]])) } ))
+  nknots = unlist(lapply(fit$iterations, function(x) { return(length(x$knots[[1]])) } ))
   ts.plot(nknots)
   summary(nknots)
   
-  slopes = unlist(lapply(result, function(x) { return(x$slope.marginal[[1]]) }))
+  slopes = unlist(lapply(fit$iterations, function(x) { return(x$slope.marginal[[1]]) }))
   summary(slopes)
   ts.plot(slopes)
   
