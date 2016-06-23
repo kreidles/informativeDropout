@@ -13,12 +13,14 @@ RoxygenNote: 5.0.1
 Depends:
     R (>= 3.1.0)
 Imports:
-    matrixcalc,MCMCpack,gtools,Matrix,splines
+    matrixcalc,MCMCpack,gtools,Matrix,splines,MASS
 VignetteBuilder: knitr
 Collate:
     'generics.R'
     'bayesianSplineFit.R'
+    'data.R'
     'dirichletProcessFit.R'
     'mixedModelFit.R'
     'informativeDropout.R'
     'examples.R'
+    'examples_bayes_splines.R'
