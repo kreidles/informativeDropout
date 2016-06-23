@@ -43,3 +43,14 @@
 #'   ...
 #' }
 "macs"
+
+#' A simulated data set based on the Multicenter Aids study
+#' Longitudinal data of HIV in men who are both users and non-users of IV drugs
+#'
+#' @format A data frame with 53940 rows and 10 variables:
+#' \describe{
+#'   \item{price}{price, in US dollars}
+#'   \item{carat}{weight of the diamond, in carats}
+#'   ...
+#' }
+"sim_1"

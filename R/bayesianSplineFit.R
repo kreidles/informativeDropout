@@ -367,6 +367,7 @@ addKnot.binary <- function(model.options, knots.previous, outcomes,
 #' @param betaCovariates regression coefficients for covariates
 #' @param sigma.error residual variance
 #' 
+#' @importFrom MASS ginv
 #' @return list containing updated X, knots, Theta, and boolean indicating if change accepted
 #' 
 addKnot.gaussian <- function(model.options, knots.previous, outcomes, 
@@ -567,6 +568,7 @@ removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dro
 #' 
 #' @param 
 #' @param 
+#' @importFrom MASS ginv
 #' @return 
 #' @examples
 #' 
@@ -916,6 +918,8 @@ updateFixedEffects.binary <- function(model.options, knots.previous,
 #' @param x A number.
 #' @param y A number.
 #' @return The sum of \code{x} and \code{y}.
+#' @importFrom MASS ginv
+#' 
 #' @examples
 #' add(1, 1)
 #' add(10, 1)
@@ -1348,6 +1352,7 @@ updateCovarianceParameters.gaussian <- function(model.options, totalObservations
 #' @param times.dropout dropout times
 #' 
 #' @importFrom splines ns
+#' @importFrom gtools rdirichlet
 #'
 calculateMarginalSlope <- function(knotsByGroup, ThetaByGroup, subjectsPerGroup,
                                    times.dropout) {
@@ -1787,14 +1792,14 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                                     group.outcomes, group.times.dropout, group.times.observation, 
                                     group.covariates, X.previous=X[[group.index]], 
                                     model.current$Theta[[group.index]], group.Z, group.alpha, 
-                                    model.current$betaCovariates,  
+                                    model.current$betas.covariates,  
                                     sigma.error=model.current$sigma.error)
         } else {
           # binary case
           result = addKnot.binary(model.options, model.current$knots[[group.index]], group.outcomes, 
                                   group.times.dropout, group.times.observation, 
                                   group.covariates, X[[group.index]], model.current$Theta[[group.index]],
-                                  group.Z, group.alpha, model.current$betaCovariates)
+                                  group.Z, group.alpha, model.current$betas.covariates)
         }
         
         # update the model iteration
@@ -1810,7 +1815,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
           result = removeKnot.gaussian(model.options, model.current$knots[[group.index]], 
                                        group.outcomes, group.times.dropout, group.times.observation, 
                                        group.covariates, X[[group.index]], model.current$Theta[[group.index]],
-                                       group.Z, group.alpha, model.current$betaCovariates, 
+                                       group.Z, group.alpha, model.current$betas.covariates, 
                                        model.current$sigma.error)
         } else {
           # remove a knot
@@ -1818,7 +1823,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                                      group.outcomes, group.times.dropout, 
                                      group.times.observation, group.covariates,
                                      X[[group.index]], model.current$Theta[[group.index]], 
-                                     group.Z, group.alpha, model.current$betaCovariates)
+                                     group.Z, group.alpha, model.current$betas.covariates)
         }
         # update the model iteration
         X[[group.index]] = result$X
@@ -1834,14 +1839,14 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                                    group.outcomes, group.times.dropout, group.times.observation, 
                                    group.covariates,
                                    X[[group.index]], model.current$Theta[[group.index]], 
-                                   group.Z, group.alpha, model.current$betaCovariates, 
+                                   group.Z, group.alpha, model.current$betas.covariates, 
                                    model.current$sigma.error)
       } else {
         result = moveKnot.binary(model.options, model.current$knots[[group.index]], 
                                  group.outcomes, group.times.dropout, group.times.observation, 
                                  group.covariates,
                                  X[[group.index]], model.current$Theta[[group.index]], 
-                                 group.Z, group.alpha, model.current$betaCovariates)
+                                 group.Z, group.alpha, model.current$betas.covariates)
       }
       X[[group.index]] = result$X
       model.current$knots[[group.index]] = result$knots
@@ -1853,13 +1858,13 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
         result = updateFixedEffects.gaussian(model.options, model.current$knots[[group.index]], 
                                              group.outcomes, group.times.dropout, group.times.observation, 
                                              group.covariates, X[[group.index]], model.current$Theta[[group.index]], 
-                                             group.Z, group.alpha, model.current$betaCovariates, 
+                                             group.Z, group.alpha, model.current$betas.covariates, 
                                              model.current$sigma.error)
       } else {
         result = updateFixedEffects.binary(model.options, model.current$knots[[group.index]], 
                                            group.outcomes, group.times.dropout, group.times.observation, 
                                            group.covariates, X[[group.index]], model.current$Theta[[group.index]], 
-                                           group.Z, group.alpha, model.current$betaCovariates)
+                                           group.Z, group.alpha, model.current$betas.covariates)
       }
       model.current$Theta[[group.index]] = result$Theta
       model.current$proposed$fixedEffects = TRUE
@@ -1872,15 +1877,15 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       if (dist == "gaussian") {
         result = updateFixedEffectsCovariates.gaussian(model.options, outcomes, covariates, 
                                                        X, model.current$Theta, 
-                                                       Z, alpha, model.current$betaCovariates,
+                                                       Z, alpha, model.current$betas.covariates,
                                                        model.current$sigma.error)
       } else {
         # binary outcome
         result = updateFixedEffectsCovariates.binary(model.options, outcomes, covariates, 
                                                      X, model.current$Theta, 
-                                                     Z, alpha, model.current$betaCovariates)
+                                                     Z, alpha, model.current$betas.covariates)
       }
-      model.current$betaCovariates = result$betaCovariates
+      model.current$betas.covariates = result$betaCovariates
       model.current$proposed$fixedEffectsCovariates = TRUE
       model.current$accepted$fixedEffectsCovariates = result$accepted
     }
@@ -1892,7 +1897,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                                      subjectsPerGroup, data[,ids.var], outcomes, 
                                      data[,times.observation.var], covariates, 
                                      X, model.current$Theta, Z, alpha, 
-                                     model.current$betaCovariates,
+                                     model.current$betas.covariates,
                                      model.current$sigma.randomIntercept, 
                                      model.current$sigma.randomSlope,
                                      model.current$sigma.randomInterceptSlope,
@@ -1903,7 +1908,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                                    subjectsPerGroup, data[,ids.var], outcomes, 
                                    data[,times.observation.var], covariates, 
                                    X, model.current$Theta, Z, alpha, 
-                                   model.current$betaCovariates,
+                                   model.current$betas.covariates,
                                    model.current$sigma.randomIntercept, 
                                    model.current$sigma.randomSlope,
                                    model.current$sigma.randomInterceptSlope)
@@ -1913,7 +1918,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
       result = updateCovarianceParameters.gaussian(model.options, nrow(data), 
                                                    numSubjects, firstObsPerSubject,
                                                    outcomes, covariates, X, model.current$Theta,
-                                                   Z, alpha, model.current$betaCovariates,
+                                                   Z, alpha, model.current$betas.covariates,
                                                    sigma.error)
     } else {
       result = updateCovarianceParameters.binary(model.options, numSubjects, firstObsPerSubject,
