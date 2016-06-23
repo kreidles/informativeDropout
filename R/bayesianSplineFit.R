@@ -1134,8 +1134,8 @@ updateRandomEffects.binary <- function(numSubjects, numObservations, firstObsPer
   # Update B1 and B2 using MH step
   # get previous log likelihood
   y <- as.matrix(outcomes)
-  C = as.matrix(covariates)
   if (!is.null(covariates)) {
+    C = as.matrix(covariates)
     cBeta = as.vector(C %*% betaCovariates)
   }
   
@@ -1231,13 +1231,13 @@ updateRandomEffects.gaussian <- function(numSubjects, numObservations, firstObsP
   tau.randomInterceptSlope = 1 / sigma.randomInterceptSlope
   
   # build the residuals
-  cBeta = vector()
+  XTheta = vector()
   for(i in 1:length(X)) {
-    cBeta.group = X[[i]] %*% Theta[[i]]
-    cBeta <- c(cBeta, cBeta.group) 
+    XTheta.group = X[[i]] %*% Theta[[i]]
+    XTheta <- c(XTheta, XTheta.group) 
   }
   # calculate the residuals
-  residuals <- outcomes - cBeta - Z$slope * alpha$slope
+  residuals <- outcomes - XTheta - Z$slope * alpha$slope
   if (!is.null(covariates)) {
     residuals <- residuals - as.matrix(covariates) %*% as.matrix(betaCovariates)
   }
@@ -1255,7 +1255,7 @@ updateRandomEffects.gaussian <- function(numSubjects, numObservations, firstObsP
   
   # get the conditional distribution of the random slope -- FIX RESIDUALS!
   # update the residuals
-  residuals = outcomes - cBeta - Z$intercept * alpha$intercept 
+  residuals = outcomes - XTheta - Z$intercept * alpha$intercept 
   if (!is.null(covariates)) {
     residuals <- residuals - as.matrix(covariates) %*% as.matrix(betaCovariates)
   }
