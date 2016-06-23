@@ -69,7 +69,4 @@ in cluster k, for k = 1 to the number of clusters}
 
 \item{expected.slope}{expected value of the random slopes}
 }
-\description{
-Data stored with each iteration of the Dirichlet process model
-}
 

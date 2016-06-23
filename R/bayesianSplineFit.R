@@ -3,12 +3,12 @@
 #
 #
 #
+#' @include generics.R
 
-#' bayes.splines.iteration
-#' 
 #' Data stored with each iteration of the Bayesian spline model
 #' during the RJMCMC run
 #'
+#' @title bayes.splines.iteration
 #' @param knots list of knot positions by group
 #' @param Theta list of spline coefficients by group
 #' @param betas.covariates regression coefficients related to covariates
@@ -22,7 +22,6 @@
 #' @param sigma.error.rate for Gaussian outcomes, the rate hyperparamter of the inverse gamma
 #' distribution of the residual error
 #' @param shape.tau
-#'
 #'
 #' @export bayes.splines.iteration
 #'
@@ -1424,34 +1423,6 @@ calculateDropoutTimeSpecificSlope <- function(dropoutEstimationTimes, knotsByGro
   return(dropoutSpecificSlopes)
 }
 
-#' Fit a simple linear model to get initial values for regression
-#' coefficients associated with splines
-#' 
-#' @param dist the distribution of the outcome ("gaussian" or "binary") 
-#' @param covariates date frame containing covariate values
-#' @param outcomes vector of outcomes
-#' 
-#' @export getInitialEstimatesTheta
-#' 
-getInitialEstimatesTheta <- function(dist, groupList, X, outcomes) {
-  data.theta = cbind(outcomes, X)
-  formula = as.formula(paste(c(paste(names(outcomes), "~"), 
-                               paste(names(X)[2:length(names(X))], 
-                                     collapse=" + ")), 
-                             collapse=" "))
-  if (dist == 'gaussian') {
-    fit.Theta <- lm(formula, data=data.theta)
-    return (lapply(1:length(groupList), function(i) {
-      return (as.vector(coef(fit.Theta)))
-    }))
-  } else {
-    # binomial
-    fit.Theta <- glm(formula, family=binomial, data=data.theta)
-    return (lapply(1:length(groupList), function(i) {
-      return (as.vector(coef(fit.Theta)))
-    }))
-  }
-}
 
 #'
 #' calculate the acceptance probability for a given update step in the Bayesian

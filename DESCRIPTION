@@ -10,6 +10,15 @@ Description: Varying coefficient models to account for informative dropout in
     longitudinal studies
 License: GPLv3
 RoxygenNote: 5.0.1
-Depends: R (>= 3.1.0)
-Imports: matrixcalc,MCMCpack,gtools,Matrix,splines
+Depends:
+    R (>= 3.1.0)
+Imports:
+    matrixcalc,MCMCpack,gtools,Matrix,splines
 VignetteBuilder: knitr
+Collate:
+    'generics.R'
+    'bayesianSplineFit.R'
+    'dirichletProcessFit.R'
+    'mixedModelFit.R'
+    'informativeDropout.R'
+    'examples.R'

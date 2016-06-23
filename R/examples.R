@@ -1,15 +1,14 @@
 #
 # Example simulations to accompany the manuscript
 #
-#
+#' @include informativeDropout.R
 
 #####################################
 # Dirichlet process model examples
 #####################################
 
-#
-#
-#
+#'
+#'
 dp_gaussian_2group_covar <- function() {
   data <- read.csv("../data/macs4sarah.csv")
   model.options=dirichlet.model.options(iterations=100, n.clusters=60, burnin=0, thin=1,
@@ -205,11 +204,11 @@ example.dp_binary_1group_covar <- function() {
   
   
   set.seed(1066)
-  fit = informativeDropout.bayes.dirichlet(data, ids.var, 
+  fit = informativeDropout(data, ids.var, 
                            outcomes.var, groups.var,
                            covariates.var, 
                            times.dropout.var, times.observation.var,
-                           dist, model.options)
+                            method, dist, model.options)
   
   summary(fit)
 }

@@ -2,8 +2,7 @@
 % Please edit documentation in R/informativeDropout.R
 \name{informativeDropout}
 \alias{informativeDropout}
-\title{Fit a varying coefficient model for longitudinal studies with
-informative dropout.}
+\title{informativeDropout}
 \usage{
 informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var,
   times.dropout.var, times.observation.var, method = "bayes.splines",
@@ -29,9 +28,5 @@ informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var,
 \item{dist}{the distribution of the outcome, valid values are "gaussian" or "binary"}
 
 \item{model.options}{model options (see dirichlet.model.options for details)}
-}
-\description{
-Fit a varying coefficient model for longitudinal studies with
-informative dropout.
 }
 

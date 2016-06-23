@@ -1,5 +1,6 @@
 .Rproj.user
 .Rhistory
 .Rbuildignore
-
+.Rdata
+.Rapp.history
 inst/doc

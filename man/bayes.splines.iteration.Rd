@@ -34,8 +34,4 @@ distribution of the residual error}
 
 \item{shape.tau}{}
 }
-\description{
-Data stored with each iteration of the Bayesian spline model
-during the RJMCMC run
-}
 

@@ -4,10 +4,13 @@
 #
 #
 
-#' dirichlet.iteration
+#' @include generics.R
+
+
 #' 
 #' Data stored with each iteration of the Dirichlet process model
 #'
+#' @title dirichlet.iteration
 #' @param weights.mixing vector containing the probability of belonging to cluster k, 
 #'      for k = 1 to the number of clusters
 #' @param weights.conditional vector containing the probability of belonging to cluster k, given
@@ -304,10 +307,10 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=1, print=
   
 }
 
-#' dirichlet.fit
 #' 
 #' Model fit for a Dirichlet Process model run
 #' 
+#' @title dirichlet.fit
 #' @param model.options the original model options
 #' @param dist the distribution of the outcome ("gaussian" or "binary")
 #' @param groups the list of groups
@@ -563,11 +566,10 @@ sensitivity.slope <- function(x, ...) {
 
 
 #'
-#' infortmativeDropout.bayes.dirichlet
-#'
 #' Fit a bayesian model which accounts for dropout by modeling the 
 #' releationship between dropout time and slope with natural cubic B-splines
 #'
+#' @title infortmativeDropout.bayes.dirichlet
 #' @param data the data set 
 #' @param ids.var column of the data set containing participant identifiers
 #' @param outcomes.var column of the data set containing the outcome variable
@@ -584,7 +586,7 @@ sensitivity.slope <- function(x, ...) {
 #' @importFrom mvtnorm dmvnorm rmvnorm
 #' @importFrom Hmisc rMultinom
 #'
-#' @export informativeDropout.bayes.dirichlet
+#' @export
 #'
 informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, groups.var, 
                                                covariates.var, 
@@ -1114,7 +1116,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       
       
     } # END GROUP-SPECIFIC UPDATE LOOP
-    
+
     # combine the random effects for each group into complete arrays
     intercepts = vector()
     slopes = vector()
@@ -1158,9 +1160,9 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         # build the weight matrix
         weight <- Diagonal(x = prob.previous * (1-prob.previous))
         # build the covariance of the beta coefficients and make sure it is positive definite
-        covar <- as.matrix(nearPD(solve(r0.inv + crossprod(C, weight %*% C)))$mat)
+        covar <- as.matrix(nearPD(solve(r0.inv + crossprod(C, as.matrix(weight %*% C))))$mat)
         # build the mean
-        mu <- covar  %*% (crossprod(C, weight %*% yt))
+        mu <- covar  %*% (crossprod(C, as.matrix(weight %*% yt)))
         # draw the proposed coefficients for the fixed effects
         beta.covariates.star <- rmvnorm(1, mu, covar)
         cBeta.star <- as.vector(C %*% beta.covariates.star)
@@ -1174,8 +1176,8 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         
         y.star <- cBeta.star + (y - prob.star) * (1 / (prob.star * (1 - prob.star)))
         weight.star <- Diagonal(x=prob.star * (1 - prob.star))
-        covar.star <- as.matrix(nearPD(solve(r0.inv + crossprod(C, weight.star %*% C)))$mat)
-        mu.star <- covar.star %*% (crossprod(C,weight.star%*%y.star))
+        covar.star <- as.matrix(nearPD(solve(r0.inv + crossprod(C, as.matrix(weight.star %*% C))))$mat)
+        mu.star <- covar.star %*% (crossprod(C,as.matrix(weight.star%*%y.star)))
         
         # Metropolis hastings step
         rho <- (loglikelihood.star - loglikelihood.previous + 
