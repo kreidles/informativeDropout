@@ -1151,7 +1151,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         prob.previous = inv.logit(eta.previous)
         # adjust probabilities within tolerance levels
         prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
-        prob.previous[prob.previous < model.options$prob.max] <-  model.options$prob.max
+        prob.previous[prob.previous > model.options$prob.max] <-  model.options$prob.max
         loglikelihood.previous <- sum(log((1 - prob.previous[y==0]))) + sum(log(prob.previous[y==1]))    
         
         # build y-tilde

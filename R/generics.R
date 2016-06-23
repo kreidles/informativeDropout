@@ -67,7 +67,7 @@ wls.binary <- function(y, X, eta.wls, model.options) {
   var = (prob * (1 - prob))
   y.wls <- model.options$eta.null + (y - prob) * (1 / var)
   weight <- Diagonal(x = var)
-  result <- solve(as.matrix(nearPD(crossprod(X, weight %*% X))$mat)) %*% (crossprod(X, weight %*% y.wls))
+  result <- solve(as.matrix(nearPD(crossprod(X, as.matrix(weight %*% X)))$mat)) %*% (crossprod(X, as.matrix(weight %*% y.wls)))
   return(as.vector(result))
 } 
 

@@ -317,7 +317,7 @@ addKnot.binary <- function(model.options, knots.previous, outcomes,
   prob.previous = inv.logit(eta.previous)
   # adjust probabilities within tolerance levels
   prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
-  prob.previous[prob.previous < model.options$prob.max] <-  model.options$prob.max
+  prob.previous[prob.previous > model.options$prob.max] <-  model.options$prob.max
   loglikelihood.previous <- sum(log((1 - prob.previous[outcomes==0]))) + sum(log(prob.previous[outcomes==1]))    
   
   
@@ -326,7 +326,7 @@ addKnot.binary <- function(model.options, knots.previous, outcomes,
   prob.star = inv.logit(eta.star)
   # adjust probabilities within tolerance levels
   prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
-  prob.star[prob.star < model.options$prob.max] <-  model.options$prob.max
+  prob.star[prob.star > model.options$prob.max] <-  model.options$prob.max
   loglikelihood.star <- sum(log((1 - prob.star[outcomes==0]))) + sum(log(prob.star[outcomes==1]))    
   
   #Calculate Acceptance Probability  
@@ -523,7 +523,7 @@ removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dro
   prob.previous = inv.logit(eta.previous)
   # adjust probabilities within tolerance levels
   prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
-  prob.previous[prob.previous < model.options$prob.max] <-  model.options$prob.max
+  prob.previous[prob.previous > model.options$prob.max] <-  model.options$prob.max
   loglikelihood.previous <- sum(log((1 - prob.previous[outcomes==0]))) + sum(log(prob.previous[outcomes==1]))    
   
   # calculate the proposal eta and associated probability
@@ -531,7 +531,7 @@ removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dro
   prob.star = inv.logit(eta.star)
   # adjust probabilities within tolerance levels
   prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
-  prob.star[prob.star < model.options$prob.max] <-  model.options$prob.max
+  prob.star[prob.star > model.options$prob.max] <-  model.options$prob.max
   loglikelihood.star <- sum(log((1 - prob.star[outcomes==0]))) + sum(log(prob.star[outcomes==1]))    
   
   # Calculate birth and death probabilities                                                        
@@ -722,7 +722,7 @@ moveKnot.binary <- function(model.options, knots.previous,
     prob.previous = inv.logit(eta.previous)
     # adjust probabilities within tolerance levels
     prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
-    prob.previous[prob.previous < model.options$prob.max] <-  model.options$prob.max
+    prob.previous[prob.previous > model.options$prob.max] <-  model.options$prob.max
     loglikelihood.previous <- sum(log((1 - prob.previous[outcomes==0]))) + sum(log(prob.previous[outcomes==1]))    
     
     # calculate the proposal eta and associated probability
@@ -730,7 +730,7 @@ moveKnot.binary <- function(model.options, knots.previous,
     prob.star = inv.logit(eta.star)
     # adjust probabilities within tolerance levels
     prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
-    prob.star[prob.star < model.options$prob.max] <-  model.options$prob.max
+    prob.star[prob.star > model.options$prob.max] <-  model.options$prob.max
     loglikelihood.star <- sum(log((1 - prob.star[outcomes==0]))) + sum(log(prob.star[outcomes==1]))    
     
     # Calculate the acceptance probability
@@ -866,7 +866,7 @@ updateFixedEffects.binary <- function(model.options, knots.previous,
   prob.previous = inv.logit(eta.previous)
   # adjust probabilities within tolerance levels
   prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
-  prob.previous[prob.previous < model.options$prob.max] <-  model.options$prob.max
+  prob.previous[prob.previous > model.options$prob.max] <-  model.options$prob.max
   loglikelihood.previous <- sum(log((1 - prob.previous[y==0]))) + sum(log(prob.previous[y==1]))    
   
   # create the covariance matrix for the intercept and theta coefficients for the splines - R0
@@ -877,9 +877,9 @@ updateFixedEffects.binary <- function(model.options, knots.previous,
   # build the weight matrix
   weight <- Diagonal(x = prob.previous * (1-prob.previous))
   # build the covariance of the beta coefficients and make sure it is positive definite
-  covar <- as.matrix(nearPD(solve(covarIntThetaInverse + crossprod(X.previous, weight %*% X.previous)))$mat)
+  covar <- as.matrix(nearPD(solve(covarIntThetaInverse + crossprod(X.previous, as.matrix(weight %*% X.previous))))$mat)
   # build the mean
-  mu <- covar  %*% (crossprod(X.previous, weight %*% yt))
+  mu <- covar  %*% (crossprod(X.previous, as.matrix(weight %*% yt)))
   # draw the proposed coefficients for the fixed effects
   Theta.star <- rmvnorm(1, mu, covar)
   
@@ -889,13 +889,13 @@ updateFixedEffects.binary <- function(model.options, knots.previous,
   prob.star = inv.logit(eta.previous)
   # adjust probabilities within tolerance levels
   prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
-  prob.star[prob.star < model.options$prob.max] <-  model.options$prob.max
+  prob.star[prob.star > model.options$prob.max] <-  model.options$prob.max
   loglikelihood.star <- sum(log((1 - prob.star[y == 0]))) + sum(log(prob.star[y == 1]))    
   
   y.star <- XTheta.star + (y - prob.star) * (1 / (prob.star * (1 - prob.star)))
   weight.star <- Diagonal(x=prob.star * (1 - prob.star))
-  covar.star <- as.matrix(nearPD(solve(covarIntThetaInverse + crossprod(X.previous, weight.star %*% X.previous)))$mat)
-  mu.star <- covar.star %*% (crossprod(X.previous, weight.star %*% y.star))
+  covar.star <- as.matrix(nearPD(solve(covarIntThetaInverse + crossprod(X.previous, as.matrix(weight.star %*% X.previous))))$mat)
+  mu.star <- covar.star %*% (crossprod(X.previous, as.matrix(weight.star %*% y.star)))
   
   # Metropolis hastings step
   rho <- (loglikelihood.star - loglikelihood.previous + 
@@ -997,58 +997,64 @@ updateFixedEffectsCovariates.binary <- function(model.options, outcomes, covaria
   # build components of eta
   y <- as.matrix(outcomes)
   C = as.matrix(covariates)
-  cBeta = as.vector(C %*% betaCovariates.previous)
+  cBeta = C %*% betaCovariates.previous
+  # build X * beta for each group and combine into a single vector
+  XTheta = vector()
+  for(i in 1:length(X)) {
+    XTheta.group = X[[i]] %*% Theta[[i]]
+    XTheta <- c(XTheta, XTheta.group) 
+  }
+  
   zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
-  XTheta.previous = X.previous %*% Theta.previous 
   # calculate the previous eta and associated probability
-  eta.previous = as.vector(XTheta.previous + cBeta + zAlpha)
+  eta.previous = as.vector(XTheta + cBeta + zAlpha)
   prob.previous = inv.logit(eta.previous)
   # adjust probabilities within tolerance levels
   prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
-  prob.previous[prob.previous < model.options$prob.max] <-  model.options$prob.max
+  prob.previous[prob.previous > model.options$prob.max] <-  model.options$prob.max
   loglikelihood.previous <- sum(log((1 - prob.previous[y==0]))) + sum(log(prob.previous[y==1]))    
   
   # create the covariance matrix for the intercept and theta coefficients for the splines - R0
-  covarIntTheta <- diag(rep(sigma.beta, (length(knots.previous)+1))) 
-  covarIntThetaInverse <- diag(rep(1/sigma.beta, (length(knots.previous)+1))) 
+  covarBeta <- diag(ncol(covariates)) * sigma.beta
+  covarBetaInverse <- diag(ncol(covariates)) * 1/sigma.beta
+  
   # build y-tilde
   yt = cBeta + (y - prob.previous) * (1 / (prob.previous * (1 - prob.previous)))
   # build the weight matrix
   weight <- Diagonal(x = prob.previous * (1-prob.previous))
   # build the covariance of the beta coefficients and make sure it is positive definite
-  covar <- as.matrix(nearPD(solve(covarIntThetaInverse + crossprod(C, weight %*% C)))$mat)
+  covar <- as.matrix(nearPD(solve(covarBetaInverse + crossprod(C, as.matrix(weight %*% C))))$mat)
   # build the mean
-  mu <- covar  %*% (crossprod(C, weight %*% yt))
+  mu <- covar  %*% (crossprod(C, as.matrix(weight %*% yt)))
   # draw the proposed coefficients for the fixed effects
   betaCovariates.star <- rmvnorm(1, mu, covar)
   
   # get proposal probabilities
-  eta.star <- XTheta.previous + C %*% betaCovariates.star + zAlpha
+  cBeta.star <- C %*% betaCovariates.star
+  eta.star <- XTheta + cBeta.star + zAlpha
   prob.star = inv.logit(eta.star)
   # adjust probabilities within tolerance levels
   prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
-  prob.star[prob.star < model.options$prob.max] <-  model.options$prob.max
+  prob.star[prob.star > model.options$prob.max] <-  model.options$prob.max
   loglikelihood.star <- sum(log((1 - prob.star[y == 0]))) + sum(log(prob.star[y == 1]))    
   
   y.star <- cBeta.star + (y - prob.star) * (1 / (prob.star * (1 - prob.star)))
   weight.star <- Diagonal(x=prob.star * (1 - prob.star))
-  covar.star <- as.matrix(nearPD(solve(covarIntThetaInverse + crossprod(C, weight.star %*% C)))$mat)
-  mu.star <- covar.star %*% (crossprod(C,weight.star%*%y.star))
-  
+  covar.star <- as.matrix(nearPD(solve(covarBetaInverse + crossprod(C, as.matrix(weight.star %*% C))))$mat)
+  mu.star <- covar.star %*% (crossprod(C, as.matrix(weight.star%*%y.star)))
+
   # Metropolis hastings step
   rho <- (loglikelihood.star - loglikelihood.previous + 
-            log(dmvnorm(as.vector(betaCovariates.star), as.vector(mu.star), covar.star)) - 
-            log(dmvnorm(pbeta, as.vector(mnt),covt)) +
-            (crossprod(as.vector(betaCovariates.star)) - tcrossprod(prob.star))/ (2 * sigma.beta))
-  
+            log(dmvnorm(as.vector(betaCovariates.previous), as.vector(mu.star), covar.star)) - 
+            log(dmvnorm(as.vector(betaCovariates.star), as.vector(mu), covar)) +
+            (crossprod(as.vector(betaCovariates.previous)) - tcrossprod(betaCovariates.star))/ (2 * sigma.beta))
   if (rho > log(runif(1))) {
     return (list(betaCovariates=as.vector(betaCovariates.star), accepted=TRUE))
   } else {
     return (list(betaCovariates=betaCovariates.previous, accepted=FALSE))
   }
+  
 }
-
-
 
 #'
 #' Update the regression coefficients related to common
@@ -1062,20 +1068,21 @@ updateFixedEffectsCovariates.gaussian <- function(model.options, outcomes, covar
   sigma.beta <- model.options$sigma.beta
   
   # build X * beta for each group and combine into a single vector
-  cBeta = vector()
+  XTheta = vector()
   for(i in 1:length(X)) {
-    cBeta.group = X[[i]] %*% Theta[[i]]
-    cBeta <- c(cBeta, cBeta.group) 
+    XTheta.group = X[[i]] %*% Theta[[i]]
+    XTheta <- c(XTheta, XTheta.group) 
   }
   
   # calculate the residuals
-  residuals <- outcomes - cBeta - Z$intercept * alpha$intercept - Z$slope * alpha$slope
+  residuals <- outcomes - XTheta - Z$intercept * alpha$intercept - Z$slope * alpha$slope
   residuals = residuals[,outcomes.var]
   # get the proposed mean/variance of the fixed effects associated with covariates
   covariates.matrix = as.matrix(covariates)
-  covarIntTheta <- diag(rep(sigma.beta, ncol(covariates))) 
-  covarIntThetaInverse <- diag(rep(1/sigma.beta, ncol(covariates))) 
-  proposedCovariance <- ginv(covarIntThetaInverse + 
+  covarBeta <- diag(ncol(covariates)) * sigma.beta
+  covarBetaInverse <- diag(ncol(covariates)) * 1/sigma.beta
+  
+  proposedCovariance <- ginv(covarBetaInverse + 
                                (1/sigma.error) * t(covariates.matrix) %*% covariates.matrix)
   proposedMean <- proposedCovariance %*% 
     ((1/sigma.error) * t(covariates.matrix) %*% as.matrix(residuals))
@@ -1097,10 +1104,10 @@ updateFixedEffectsCovariates.gaussian <- function(model.options, outcomes, covar
   
   # calculate the acceptance probability
   rho<-sum(log(dnorm(as.vector(resid.star), 0, sqrt(sigma.error)))) + 
-    log(dmvnorm(betaCovariates.star, rep(0, ncol(covariates)), covarIntTheta)) + 
+    log(dmvnorm(betaCovariates.star, rep(0, ncol(covariates)), covarBetaInverse)) + 
     log(dmvnorm(betaCovariates.previous, proposedMean, proposedCovariance)) - 
     sum(log(dnorm(resid.star, 0, sqrt(sigma.error)))) - 
-    log(dmvnorm(betaCovariates.previous, rep(0, ncol(covariates)), covarIntTheta)) - 
+    log(dmvnorm(betaCovariates.previous, rep(0, ncol(covariates)), covarBetaInverse)) - 
     log(dmvnorm(betaCovariates.star, proposedMean, proposedCovariance))
   
   if (rho > log(runif(1))) {
@@ -1131,15 +1138,24 @@ updateRandomEffects.binary <- function(numSubjects, numObservations, firstObsPer
   if (!is.null(covariates)) {
     cBeta = as.vector(C %*% betaCovariates)
   }
-  XTheta = X %*% Theta
-  zAlpha.previous = Z[,1] * alpha[,1] + Z.onePerSubject[,2] * alpha[,2]
+  
+  # build X * beta for each group and combine into a single vector
+  XTheta = vector()
+  for(i in 1:length(X)) {
+    XTheta.group = X[[i]] %*% Theta[[i]]
+    XTheta <- c(XTheta, XTheta.group) 
+  }
+
+  zAlpha.previous = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
   # calculate the previous eta and associated probability
   eta.previous = as.vector(XTheta + ifelse(!is.null(covariates), cBeta, 0) + zAlpha.previous)
   prob.previous = inv.logit(eta.previous)
   # adjust probabilities within tolerance levels
   prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
-  prob.previous[prob.previous < model.options$prob.max] <-  model.options$prob.max
-  loglikelihood.previous <- sum(log((1 - prob.previous[y==0]))) + sum(log(prob.previous[y==1]))    
+  prob.previous[prob.previous > model.options$prob.max] <-  model.options$prob.max
+  loglikelihood.previous <- rep(0, length(y))    
+  loglikelihood.previous[y==0] <- log(1 - prob.previous[y==0])  
+  loglikelihood.previous[y==1] <- log(prob.previous[y==1])
   
   ### Get the proposal log likelihood by drawing a candidate from a symmetric random walk proposal
   # get the random intercepts, one per subject
@@ -1149,22 +1165,23 @@ updateRandomEffects.binary <- function(numSubjects, numObservations, firstObsPer
   alpha.star.intercept <- alpha.onePerSubject[,1] + noise[,1]
   alpha.star.slope <- alpha.onePerSubject[,2] + noise[,2]
   # calculate the proposal log likelihood
-  zAlpha.star = Z[,1] * rep(alpha.star.intercept, numObservations) + 
-    Z.onePerSubject[,2] * rep(alpha.star.slope, numObservations)
+  zAlpha.star = Z[,1] * rep(alpha.star.intercept, numObservations) + Z[,2] * rep(alpha.star.slope, numObservations)
   # calculate the previous eta and associated probability
   eta.star = as.vector(XTheta + ifelse(!is.null(covariates), cBeta, 0) + zAlpha.star)
   prob.star = inv.logit(eta.star)
   # adjust probabilities within tolerance levels
   prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
-  prob.star[prob.star < model.options$prob.max] <-  model.options$prob.max
-  loglikelihood.star <- sum(log((1 - prob.star[y==0]))) + sum(log(prob.star[y==1]))  
-  
+  prob.star[prob.star > model.options$prob.max] <-  model.options$prob.max
+  loglikelihood.star <- rep(0, length(y))    
+  loglikelihood.star[y==0] <- log(1 - prob.star[y==0])  
+  loglikelihood.star[y==1] <- log(prob.star[y==1])
   
   sigma.alpha = matrix(c(sigma.randomIntercept, 
                          sigma.randomInterceptSlope, 
                          sigma.randomInterceptSlope, 
                          sigma.randomSlope), nrow=2, byrow=TRUE)
   alpha.star.onePerSubject = cbind(alpha.star.intercept, alpha.star.intercept)
+  
   ratio <- (
     tapply(loglikelihood.star, ids, sum) +
     dmvnorm(alpha.star.onePerSubject, c(0,0), sigma.alpha, log=TRUE) - 
@@ -1280,7 +1297,7 @@ updateCovarianceParameters.binary <- function(model.options, numSubjects,
   # sample from an inverse wishart to update the covariance of the random effects
   perSubjectAlpha = alpha[firstObsPerSubject,]
   sigma.alpha <- riwish(model.options$sigma.randomEffects.df + numSubjects, 
-                        model.options$sigma.randomEffects.scaleMatrix + crossprod(as.matrix(perSubjectAlpha)))
+                        model.options$sigma.randomEffects.scale + crossprod(as.matrix(perSubjectAlpha)))
   
   sigma.randomIntercept = sigma.alpha[1,1]
   sigma.randomSlope = sigma.alpha[2,2]
@@ -1639,8 +1656,7 @@ summary.bayes.splines.fit <- function(fit) {
 informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups.var, 
                                              covariates.var, times.dropout.var, times.observation.var, 
                                              dist, model.options) {
-  
-  
+
   # create some reasonable defaults for the start positions and candidate positions
   # if not specified
   if (is.null(model.options$knots.positions.start) || is.null(model.options$knots.positions.candidate)) {
@@ -1732,7 +1748,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     if (is.null(model.options$eta.null)) {
       eta.null = model.options$eta.null
     } else {
-      eta.null = logit(sum(outcomes)/length(outcomes))
+      eta.null = logit(sum(outcomes[,outcomes.var])/length(outcomes[,outcomes.var]))
     }
   }
   
@@ -1927,8 +1943,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                                                    Z, alpha, model.current$betas.covariates,
                                                    sigma.error)
     } else {
-      result = updateCovarianceParameters.binary(model.options, numSubjects, firstObsPerSubject,
-                                                 outcomes, alpha)
+      result = updateCovarianceParameters.binary(model.options, numSubjects, firstObsPerSubject, alpha)
     }
     model.current$sigma.error = result$sigma.error
     model.current$sigma.randomIntercept = result$sigma.randomIntercept
