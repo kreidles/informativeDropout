@@ -32,6 +32,7 @@ model.options <- bayes.splines.model.options(iterations=100, burnin=10, thin=1, 
                                              knots.positions.start=c(330,550,1060), 
                                              knots.positions.candidate=seq(10,max(data$day),10),
                                              dropout.estimationTimes=c(1,2,3),
+                                             sigma.error=1,
                                              sigma.error.shape.tau=0.001, sigma.error.rate.tau=0.001,
                                              sigma.beta=1, lambda.numKnots=1,
                                              sigma.residual=1,
@@ -40,7 +41,6 @@ model.options <- bayes.splines.model.options(iterations=100, burnin=10, thin=1, 
                                                sigma.randomInterceptSlope = 0,
                                              sigma.randomEffects.df = 3,
                                              sigma.randomEffects.scale = diag(2))
-
 
 # select columns to include in the model
 ids.var = "WIHSID"
@@ -64,5 +64,5 @@ fit = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var
                          method, dist, model.options)  
 
 # summarize the result
-summarize(fit)
+summary(fit)
 

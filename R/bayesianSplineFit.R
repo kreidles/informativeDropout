@@ -98,7 +98,7 @@ bayes.splines.model.options = function(iterations=10000, burnin=500, thin=1, pri
                                        prob.min=0.00001, prob.max=0.99999, accept.rate.adjust=1,
                                        dropout.estimationTimes=NULL,
                                        sigma.beta=NULL, sigma.residual=NULL,
-                                       sigma.error=0,
+                                       sigma.error=NULL,
                                        sigma.error.shape.tau=NULL, sigma.error.rate.tau=NULL,
                                        lambda.numKnots=NULL,
                                        sigma.randomIntercept = NULL,
@@ -129,7 +129,6 @@ bayes.splines.model.options = function(iterations=10000, burnin=500, thin=1, pri
   if (is.na(knots.max) || is.null(knots.max) || knots.max <= knots.min) {
     stop("model options error :: The maximum number of knots must be greater than the minimum number of knots.")
   }
-  
   
   # validate the prior options
   if (is.na(sigma.error.shape.tau) || is.null(sigma.error.shape.tau) || sigma.error.shape.tau <= 0) {
@@ -1505,28 +1504,6 @@ summary.bayes.splines.fit <- function(fit) {
     )
     row.names(marginal_slope) = c("marginal slope")
     
-    ## covariance parameters
-    param_list = c("sigma.residual","sigma.randomIntercept",
-                   "sigma.randomSlope", "sigma.randomInterceptSlope")
-    covariance_parameters = data.frame(
-      mean=numeric(length(param_list)),
-      median=numeric(length(param_list)),
-      ci_lower=numeric(length(param_list)),
-      ci_upper=numeric(length(param_list))
-    )
-    row = 1
-    for (param in param_list) {
-      param_sample <- unlist(lapply(iterations, function(x) { 
-        return(x[[param]][[group.index]])
-      }))
-      covariance_parameters$mean[row] = mean(param_sample)
-      covariance_parameters$median[row] = median(param_sample)
-      covariance_parameters$ci_lower[row] = quantile(param_sample, probs=0.025)
-      covariance_parameters$ci_upper[row] = quantile(param_sample, probs=0.975)
-      row = row + 1
-    }
-    row.names(covariance_parameters) = param_list
-    
     ## dropout time specific slopes
     slopes_by_dropout_time = data.frame(
       time=model.options$dropout.estimationTimes,
@@ -1553,12 +1530,35 @@ summary.bayes.splines.fit <- function(fit) {
     result.summary[[paste("group", group, sep="_")]] = list(
       knots = knots,
       marginal_slope = marginal_slope,
-      covariance_parameters = covariance_parameters,
       slopes_by_dropout_time = slopes_by_dropout_time
     )
   }
   
-  ## TODO for gaussian outcomes, summarize sigma.error
+  ## covariance parameters
+  param_list = c("sigma.residual","sigma.randomIntercept",
+                 "sigma.randomSlope", "sigma.randomInterceptSlope")
+  if (dist == "gaussian") {
+    param_list = c(param_list, "sigma.error")
+  }
+  covariance_parameters = data.frame(
+    mean=numeric(length(param_list)),
+    median=numeric(length(param_list)),
+    ci_lower=numeric(length(param_list)),
+    ci_upper=numeric(length(param_list))
+  )
+  row = 1
+  for (param in param_list) {
+    param_sample <- unlist(lapply(iterations, function(x) { 
+      return(x[[param]])
+    }))
+    covariance_parameters$mean[row] = mean(param_sample)
+    covariance_parameters$median[row] = median(param_sample)
+    covariance_parameters$ci_lower[row] = quantile(param_sample, probs=0.025)
+    covariance_parameters$ci_upper[row] = quantile(param_sample, probs=0.975)
+    row = row + 1
+  }
+  row.names(covariance_parameters) = param_list
+  result.summary$covariance_parameters = covariance_parameters
   
   ## summarize covariate effects
   if (!is.null(covariates.var)) {
@@ -1652,6 +1652,12 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
     if (is.null(model.options$knots.positions.start)) {
       model.options$knots.positions.start = sample(model.options$knots.positions.candidate, 
                                                    model.options$knots.min)
+    }
+  }
+  
+  if (dist == "gaussian") {
+    if (is.null(model.options$sigma.error) || is.na(model.options$sigma.error) || model.options$sigma.error <= 0) {
+      stop("Prior options error :: for Gaussian outcomes sigma.error must be greater than 0")
     }
   }
   
