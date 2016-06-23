@@ -903,7 +903,7 @@ updateFixedEffects.binary <- function(model.options, knots.previous,
             log(dmvnorm(Theta.star, as.vector(mu),covar)) +
             (crossprod(Theta.previous) - tcrossprod(Theta.star))/ (2 * sigma.beta))
   if (rho > log(runif(1))) {
-    return (list(Theta=Theta.star, accepted=TRUE))
+    return (list(Theta=as.vector(Theta.star), accepted=TRUE))
   } else {
     return (list(Theta=Theta.previous, accepted=FALSE))
   }
@@ -973,7 +973,7 @@ updateFixedEffects.gaussian <- function(model.options, knots.previous,
             (crossprod(resid.prev)-crossprod(resid.star))/(2 * sigma.error))
   
   if (rho > log(runif(1))) {
-    return (list(Theta=Theta.star, accepted=TRUE))
+    return (list(Theta=as.vector(Theta.star), accepted=TRUE))
   } else {
     return (list(Theta=Theta.previous, accepted=FALSE))
   }
@@ -1051,7 +1051,7 @@ updateFixedEffectsCovariates.binary <- function(model.options, outcomes, covaria
   if (rho > log(runif(1))) {
     return (list(betaCovariates=as.vector(betaCovariates.star), accepted=TRUE))
   } else {
-    return (list(betaCovariates=betaCovariates.previous, accepted=FALSE))
+    return (list(betaCovariates=as.vector(betaCovariates.previous), accepted=FALSE))
   }
   
 }
@@ -1335,13 +1335,13 @@ updateCovarianceParameters.gaussian <- function(model.options, totalObservations
   
   # update sigma.error
   # build the residuals
-  cBeta = vector()
+  XTheta = vector()
   for(i in 1:length(X)) {
-    cBeta.group = X[[i]] %*% Theta[[i]]
-    cBeta <- c(cBeta, cBeta.group) 
+    XTheta.group = X[[i]] %*% Theta[[i]]
+    XTheta <- c(XTheta, XTheta.group) 
   }
   # calculate the residuals
-  residuals <- outcomes - cBeta - Z$intercept * alpha$intercept - Z$slope * alpha$slope
+  residuals <- outcomes - XTheta - Z$intercept * alpha$intercept - Z$slope * alpha$slope
   if (!is.null(covariates)) {
     residuals <- residuals - as.matrix(covariates) %*% as.matrix(betaCovariates)
   }
