@@ -2,11 +2,10 @@
 % Please edit documentation in R/dirichletProcessFit.R
 \name{dirichlet.model.options}
 \alias{dirichlet.model.options}
-\title{Model options for the Dirichlet Process model.  Includes starting values, priors and
-simulation/MCMC parameters.}
+\title{dirichlet.model.options}
 \usage{
 dirichlet.model.options(iterations = 10000, burnin = 500, thin = 1,
-  start.weights.mixing = NULL, n.clusters = 15,
+  print = 1, start.weights.mixing = NULL, n.clusters = 15,
   dropout.estimationTimes = NULL, dropout.offset = 0,
   dp.concentration = NULL, dp.concentration.alpha = NULL,
   dp.concentration.beta = NULL, dp.cluster.sigma = NULL,
@@ -24,6 +23,8 @@ dirichlet.model.options(iterations = 10000, burnin = 500, thin = 1,
 iterations to throw away at the beginning of the simulation}
 
 \item{thin}{thinning interval, i.e. if thin=n, only keep every nth iteration}
+
+\item{print}{printing interval, i.e. if print=n, print a counter on every nth iteration}
 
 \item{dp.concentration}{prior value for the concentration parameter of the Dirichlet process}
 
@@ -64,6 +65,8 @@ the covariance of the baseline distribution of the Dirichlet process}
 \item{betas.covariates.sigma}{Prior covariance for the covariate regression coefficients}
 
 \item{sigma.error}{Prior for the residual error (Gaussian outcomes only)}
+
+\item{sigma.error.tau}{Hyperprior for the residual error (Gaussian outcomes only)}
 
 \item{numClusters}{number of clusters for the Dirichlet Process stick breaking model}
 }

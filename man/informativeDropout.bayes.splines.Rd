@@ -9,6 +9,25 @@ to model the relationship between dropout times and slope}
 informativeDropout.bayes.splines(data, ids.var, outcomes.var, groups.var,
   covariates.var, times.dropout.var, times.observation.var, dist, model.options)
 }
+\arguments{
+\item{data}{the data set}
+
+\item{ids.var}{column of the data set containing the participant id}
+
+\item{outcomes.var}{column of the data set containing the outcome variable}
+
+\item{groups.var}{column of the data set indicating treatment group}
+
+\item{covariates.var}{list of columns of the data set containing covariates}
+
+\item{times.dropout.var}{column of the data set containing dropout times}
+
+\item{times.observation.var}{column of the data set containing observation times}
+
+\item{dist}{distribution of the outcome (either "gaussian" or "binary")}
+
+\item{model.options}{the bayes.spines.model.options object (@seealso bayes.spines.model.options)}
+}
 \description{
 Fit a varying coefficient model for longitudinal studies with
 informative dropout.  Uses a Bayesian approach with a spline fit

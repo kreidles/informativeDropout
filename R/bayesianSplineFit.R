@@ -4,6 +4,8 @@
 #
 #
 
+#' bayes.splines.iteration
+#' 
 #' Data stored with each iteration of the Bayesian spline model
 #' during the RJMCMC run
 #'
@@ -77,6 +79,7 @@ bayes.splines.iteration <- function(knots=NULL, Theta=NULL, betas.covariates=NUL
 }
 
 
+#' bayes.splines.model.options
 #'
 #' Simulation and model options for the natural b-spline model
 #' 
@@ -202,6 +205,8 @@ bayes.splines.model.options = function(iterations=10000, burnin=500, thin=1, pri
   
 }
 
+#' bayes.splines.fit
+#' 
 #' Model fit for a Bayesian spline model run
 #' 
 #' @param model.options the original model options
@@ -231,15 +236,25 @@ bayes.splines.fit <- function(model.options, dist, groups, covariates.var, itera
   return(fit)
 }
 
-#'
+#' addKnot.binary
+#' 
 #' For binary outcomes, add a new knot and use a Metropolis-Hastings step
 #' to determine if we keep the changes to the model.
-#'
-#'
-#'
-#'
-#'
-#'
+#' 
+#' @param model.options model options
+#' @param knots.previous previous set of knots
+#' @param outcomes vector of outcomes
+#' @param times.dropout vector of dropout times
+#' @param times.observation vector of observation times 
+#' @param covariates data frame of covariates
+#' @param X.previous previous X matrix
+#' @param Theta.previous previous Theta values
+#' @param Z random effects design matrix
+#' @param alpha random effects
+#' @param betaCovariates regression coefficients for covariates
+#' 
+#' @return list containing updated X, knots, Theta, and boolean indicating if change accepted
+#' 
 addKnot.binary <- function(model.options, knots.previous, outcomes, 
                            times.dropout, times.observation, 
                            covariates, X.previous, Theta.previous,
@@ -335,15 +350,25 @@ addKnot.binary <- function(model.options, knots.previous, outcomes,
 }
 
 
-
-
+#' addKnot.gaussian
+#' 
 #' Add a new knot and use a Metropolis-Hastings step
 #' to determine if we keep the changes to the model
 #' 
-#' @param 
-#' @param 
-#' @return 
-#' @examples
+#' @param model.options model options
+#' @param knots.previous previous set of knots
+#' @param outcomes vector of outcomes
+#' @param times.dropout vector of dropout times
+#' @param times.observation vector of observation times 
+#' @param covariates data frame of covariates
+#' @param X.previous previous X matrix
+#' @param Theta.previous previous Theta values
+#' @param Z random effects design matrix
+#' @param alpha random effects
+#' @param betaCovariates regression coefficients for covariates
+#' @param sigma.error residual variance
+#' 
+#' @return list containing updated X, knots, Theta, and boolean indicating if change accepted
 #' 
 addKnot.gaussian <- function(model.options, knots.previous, outcomes, 
                              times.dropout, times.observation, 

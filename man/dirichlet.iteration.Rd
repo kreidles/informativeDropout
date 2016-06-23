@@ -2,7 +2,7 @@
 % Please edit documentation in R/dirichletProcessFit.R
 \name{dirichlet.iteration}
 \alias{dirichlet.iteration}
-\title{Data stored with each iteration of the Dirichlet process model}
+\title{dirichlet.iteration}
 \usage{
 dirichlet.iteration(weights.mixing = NULL, weights.conditional = NULL,
   cluster.assignments = NULL, betas = NULL, betas.deviations = NULL,
@@ -58,6 +58,16 @@ in cluster k, for k = 1 to the number of clusters}
 \item{expected.intercept}{the expected value of the random intercept}
 
 \item{expected.slope}{the expected value of the random slope}
+
+\item{slope.dropoutTimes}{estimated slopes by dropout times}
+
+\item{density.intercept}{estimated density of the random intercepts}
+
+\item{density.slope}{estimated density of the random slopes}
+
+\item{expected.intercept}{expected value of the random intercepts}
+
+\item{expected.slope}{expected value of the random slopes}
 }
 \description{
 Data stored with each iteration of the Dirichlet process model

@@ -205,11 +205,11 @@ example.dp_binary_1group_covar <- function() {
   
   
   set.seed(1066)
-  fit = informativeDropout(data, ids.var, 
+  fit = informativeDropout.bayes.dirichlet(data, ids.var, 
                            outcomes.var, groups.var,
                            covariates.var, 
                            times.dropout.var, times.observation.var,
-                           method, dist, model.options)
+                           dist, model.options)
   
   summary(fit)
 }

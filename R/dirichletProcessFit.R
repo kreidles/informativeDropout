@@ -3,8 +3,9 @@
 # for non-informative dropout
 #
 #
-require(matrixcalc)
 
+#' dirichlet.iteration
+#' 
 #' Data stored with each iteration of the Dirichlet process model
 #'
 #' @param weights.mixing vector containing the probability of belonging to cluster k, 
@@ -14,13 +15,13 @@ require(matrixcalc)
 #' @param cluster.assignments current cluster assignments
 #' @param betas A (k x 3) matrix of regression coefficients for the random intercept, slope,
 #' and log of the dropout time for each cluster, with k = number of clusters
+#' @param betas.deviations An (N x k) matrix of subject specific deviations from the cluster means
 #' @param betas.covariates A (c x 1) vector of regression coefficients for covariates, 
 #' with c = number of covariates
 #' @param betas.covariates.mu A (c x 1) vector representing the mean of the distribution of 
 #' regression coefficients related to covariates
 #' @param betas.covariates.sigma A (c x c) vector representing the covariance of the distribution of 
 #' regression coefficients related to covariates
-#' @param betas.deviations An (N x k) matrix of subject specific deviations from the cluster means
 #' @param dp.dist.mu0 A (3 x 1) vector of means for the baseline distribution of the Dirichlet process
 #' @param dp.dist.sigma0 A (3 x 3) matrix representing the covariance of the baseline 
 #' distribution of the Dirichlet process
@@ -34,6 +35,11 @@ require(matrixcalc)
 #' @param expected.intercept the expected value of the random intercept
 #' @param expected.slope the expected value of the random slope
 #' @param sigma.error For Gaussian outcomes, the residual error variance
+#' @param expected.intercept expected value of the random intercepts
+#' @param expected.slope expected value of the random slopes
+#' @param slope.dropoutTimes estimated slopes by dropout times
+#' @param density.intercept estimated density of the random intercepts
+#' @param density.slope estimated density of the random slopes
 #' 
 #' @export dirichlet.iteration
 #' 
@@ -104,6 +110,8 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
   
 }
 
+#' dirichlet.model.options
+#' 
 #' Model options for the Dirichlet Process model.  Includes starting values, priors and
 #' simulation/MCMC parameters.
 #'
@@ -137,6 +145,7 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
 #' @param betas.covariates.mu Prior mean for the covariate regression coefficients
 #' @param betas.covariates.sigma Prior covariance for the covariate regression coefficients
 #' @param sigma.error Prior for the residual error (Gaussian outcomes only)
+#' @param sigma.error.tau Hyperprior for the residual error (Gaussian outcomes only)
 #' 
 #' @importFrom matrixcalc is.positive.definite
 #' 
@@ -295,6 +304,8 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=1, print=
   
 }
 
+#' dirichlet.fit
+#' 
 #' Model fit for a Dirichlet Process model run
 #' 
 #' @param model.options the original model options
@@ -325,6 +336,8 @@ dirichlet.fit <- function(model.options, dist, groups, covariates.var, iteration
 }
 
 
+#' summary.dirichlet.fit
+#' 
 #' Summarize a Dirichlet model run
 #'
 #' @param fit dirichlet.fit object from an informativeDropout run.
@@ -461,14 +474,17 @@ summary.dirichlet.fit <- function(fit) {
   
 }
 
+#' plot.trace.dirichlet.fit
+#' 
 #' Produce a trace plot of the specified variable in Dirichlet model fit
 #' 
 #' @param fit the Dirichlet model fit 
 #' @param variable the variable to plot
-#' @group (optional) the group to plot.  If not specified, separate plots will
+#' @param group (optional) the group to plot.  If not specified, separate plots will
 #'    be produced for each group
 #'
 #' @export plot.trace.dirichlet.fit
+#' 
 plot.trace.dirichlet.fit <- function (fit, type="expectation", name="slope", group=1) {
   if (type == "expectation") {
     varname = paste("expected", name, sep=".")
@@ -502,14 +518,18 @@ plot.trace.dirichlet.fit <- function (fit, type="expectation", name="slope", gro
   ts.plot(sample)
 }
 
-# density plot for a parameter
+#' plot.density.dirichlet.fit
+#' 
+#' density plot for a parameter
 plot.density.dirichlet.fit <- function (fit, name="slope") {
   # take mean at each point across the iterations
   # histogram the means
 }
 
 
-# plot the slope by dropout time
+#' plot.slopeByDropout.dirichlet.fit
+#' 
+#' plot the slope by dropout time
 plot.slopeByDropout.dirichlet.fit <- function (fit, group=1, xlim=NULL, ylim=NULL) {
 
   slopes_by_dropout_time = data.frame(
@@ -561,6 +581,8 @@ sensitivity.slope <- function(x, ...) {
 #' @importFrom MCMCpack riwish
 #' @importFrom gtools inv.logit
 #' @importFrom Matrix Diagonal nearPD
+#' @importFrom mvtnorm dmvnorm rmvnorm
+#' @importFrom Hmisc rMultinom
 #'
 #' @export informativeDropout.bayes.dirichlet
 #'

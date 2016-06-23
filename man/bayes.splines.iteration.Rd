@@ -2,8 +2,7 @@
 % Please edit documentation in R/bayesianSplineFit.R
 \name{bayes.splines.iteration}
 \alias{bayes.splines.iteration}
-\title{Data stored with each iteration of the Bayesian spline model
-during the RJMCMC run}
+\title{bayes.splines.iteration}
 \usage{
 bayes.splines.iteration(knots = NULL, Theta = NULL,
   betas.covariates = NULL, sigma.residual = 1, sigma.randomIntercept = 1,

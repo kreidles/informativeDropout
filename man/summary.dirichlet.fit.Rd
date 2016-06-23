@@ -2,7 +2,7 @@
 % Please edit documentation in R/dirichletProcessFit.R
 \name{summary.dirichlet.fit}
 \alias{summary.dirichlet.fit}
-\title{Summarize a Dirichlet model run}
+\title{summary.dirichlet.fit}
 \usage{
 \method{summary}{dirichlet.fit}(fit)
 }

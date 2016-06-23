@@ -2,12 +2,37 @@
 % Please edit documentation in R/bayesianSplineFit.R
 \name{addKnot.binary}
 \alias{addKnot.binary}
-\title{For binary outcomes, add a new knot and use a Metropolis-Hastings step
-to determine if we keep the changes to the model.}
+\title{addKnot.binary}
 \usage{
 addKnot.binary(model.options, knots.previous, outcomes, times.dropout,
   times.observation, covariates, X.previous, Theta.previous, Z, alpha,
   betaCovariates)
+}
+\arguments{
+\item{model.options}{model options}
+
+\item{knots.previous}{previous set of knots}
+
+\item{outcomes}{vector of outcomes}
+
+\item{times.dropout}{vector of dropout times}
+
+\item{times.observation}{vector of observation times}
+
+\item{covariates}{data frame of covariates}
+
+\item{X.previous}{previous X matrix}
+
+\item{Theta.previous}{previous Theta values}
+
+\item{Z}{random effects design matrix}
+
+\item{alpha}{random effects}
+
+\item{betaCovariates}{regression coefficients for covariates}
+}
+\value{
+list containing updated X, knots, Theta, and boolean indicating if change accepted
 }
 \description{
 For binary outcomes, add a new knot and use a Metropolis-Hastings step

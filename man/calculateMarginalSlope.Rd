@@ -7,6 +7,15 @@
 calculateMarginalSlope(knotsByGroup, ThetaByGroup, subjectsPerGroup,
   times.dropout)
 }
+\arguments{
+\item{knotsByGroup}{list of knots by group}
+
+\item{ThetaByGroup}{list of spline coefficients by group}
+
+\item{subjectsPerGroup}{list of number of subjects by group}
+
+\item{times.dropout}{dropout times}
+}
 \description{
 Calculate the marginal slope at the given iteration
 }

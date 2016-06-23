@@ -112,13 +112,20 @@ getInitialEstimatesCovariates <- function(dist, covariates, outcomes) {
 
 
 
+#' 
 #' Fit a varying coefficient model for longitudinal studies with
 #' informative dropout. 
 #' 
-#' @param 
-#' @param 
-#' @return 
-#' @examples
+#' @param data the data set 
+#' @param ids.var column of the data set containing participant identifiers
+#' @param outcomes.var column of the data set containing the outcome variable
+#' @param groups.var column of the data set indicating the treatment groups
+#' @param covariates.var list of columns in the data set containing covariates
+#' @param times.dropout.var column of the data set containing dropout times
+#' @param times.observation.var column of the data set containing 
+#' @param method the modeling method
+#' @param dist the distribution of the outcome, valid values are "gaussian" or "binary"
+#' @param model.options model options (see dirichlet.model.options for details)
 #' 
 #' @export informativeDropout
 #' 
