@@ -4,16 +4,16 @@
 \alias{plot.trace.dirichlet.fit}
 \title{plot.trace.dirichlet.fit}
 \usage{
-\method{plot}{trace.dirichlet.fit}(fit, type = "expectation",
-  name = "slope", group = 1)
+\method{plot}{trace.dirichlet.fit}(fit, type = "expectation", groups = NULL,
+  params = NULL)
 }
 \arguments{
 \item{fit}{the Dirichlet model fit}
 
+\item{type}{the type of information to plot.}
+
 \item{group}{(optional) the group to plot.  If not specified, separate plots will
 be produced for each group}
-
-\item{variable}{the variable to plot}
 }
 \description{
 Produce a trace plot of the specified variable in Dirichlet model fit

@@ -5,7 +5,7 @@
 \title{plot.slopeByDropout.dirichlet.fit}
 \usage{
 \method{plot}{slopeByDropout.dirichlet.fit}(fit, group = 1, xlim = NULL,
-  ylim = NULL)
+  ylim = NULL, lower_tail = 0.025, upper_tail = 0.975)
 }
 \description{
 plot the slope by dropout time

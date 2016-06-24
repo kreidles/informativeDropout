@@ -4,7 +4,7 @@
 \alias{summary.dirichlet.fit}
 \title{summary.dirichlet.fit}
 \usage{
-\method{summary}{dirichlet.fit}(fit)
+\method{summary}{dirichlet.fit}(fit, upper_tail = 0.975, lower_tail = 0.025)
 }
 \arguments{
 \item{fit}{dirichlet.fit object from an informativeDropout run.}

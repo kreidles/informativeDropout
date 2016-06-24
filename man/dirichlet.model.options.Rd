@@ -14,7 +14,8 @@ dirichlet.model.options(iterations = 10000, burnin = 500, thin = 1,
   dp.dist.sigma0 = NULL, dp.dist.sigma0.nub = NULL,
   dp.dist.sigma0.Tb = NULL, betas.covariates = NULL,
   betas.covariates.mu = NULL, betas.covariates.sigma = NULL,
-  sigma.error = NULL, sigma.error.tau = NULL)
+  sigma.error = NULL, sigma.error.tau = NULL,
+  sigma.error.perGroup = FALSE)
 }
 \arguments{
 \item{iterations}{number of iterations for the MCMC simulation}
@@ -67,6 +68,8 @@ the covariance of the baseline distribution of the Dirichlet process}
 \item{sigma.error}{Prior for the residual error (Gaussian outcomes only)}
 
 \item{sigma.error.tau}{Hyperprior for the residual error (Gaussian outcomes only)}
+
+\item{sigma.error.perGroup}{If TRUE, separate sigma error parameters will be fit per group}
 
 \item{numClusters}{number of clusters for the Dirichlet Process stick breaking model}
 }

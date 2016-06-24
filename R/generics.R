@@ -26,35 +26,37 @@
 # Register some S3 generic methods for summarizing the fit object
 #
 
+#' trace plot for a parameter
 #'
-#'  trace plot for a parameter
-#'  
-#'  @export
-plot.trace <- function (x, ...) {
-  UseMethod("plot.trace", x)
+#' @param fit the model fit object
+#' @export plot.trace
+#' 
+plot.trace <- function (fit, ...) {
+  UseMethod("plot.trace", fit)
 }
 
-#'
-#'  density plot for a parameter
+#' density plot for a parameter
 #'  
-#'  @export
-plot.density <- function (x, ...) {
-  UseMethod("plot.density", x)
+#' @param fit the model fit object
+#' @export
+#' 
+plot.density <- function (fit, ...) {
+  UseMethod("plot.density", fit)
 }
 
-#'
 #' plot the slope by dropout time
-#'  
-#'  @export
-plot.slopeByDropout <- function (x, ...) {
+#'
+#' @param fit the model fit object
+#' @export  
+plot.slopeByDropout <- function (fit, ...) {
   UseMethod("plot.slopeByDropout", x)
 }
 
-#'
 #' perform sensitivity analysis on the slope results
-#'  
-#'  @export
-sensitivity <- function(x, ...) {
+#'
+#' @param fit the model fit object
+#' @export 
+sensitivity <- function(fit, ...) {
   # delta factor is multiplier on slope after dropout
   # y = int + drop * slope + (time - dropout) * delta * slope
   # arguments: min/max times, list of estimation times, 
@@ -90,7 +92,6 @@ wls.binary <- function(y, X, eta.wls, model.options) {
 #' @param covariates date frame containing covariate values
 #' @param outcomes vector of outcomes
 #' 
-#' @export getInitialEstimatesCovariates
 #'
 getInitialEstimatesCovariates <- function(dist, covariates, outcomes) {
   if (is.null(covariates) || ncol(covariates) == 0) {
@@ -117,8 +118,6 @@ getInitialEstimatesCovariates <- function(dist, covariates, outcomes) {
 #' @param dist the distribution of the outcome ("gaussian" or "binary") 
 #' @param covariates date frame containing covariate values
 #' @param outcomes vector of outcomes
-#' 
-#' @export getInitialEstimatesTheta
 #' 
 getInitialEstimatesTheta <- function(dist, groupList, X, outcomes) {
   data.theta = cbind(outcomes, X)

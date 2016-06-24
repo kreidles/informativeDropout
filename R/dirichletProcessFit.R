@@ -387,7 +387,7 @@ summary.dirichlet.fit <- function(fit, upper_tail=0.975, lower_tail=0.025) {
                  quantile(expected_intercept_sample, probs=lower_tail)),
       ci_upper=c(quantile(expected_slope_sample, probs=upper_tail),
                  quantile(expected_intercept_sample, probs=upper_tail))
-      )
+    )
     row.names(subject_specific_effects) = c("slope", "intercept")
     
     ## covariance parameters
@@ -447,7 +447,7 @@ summary.dirichlet.fit <- function(fit, upper_tail=0.975, lower_tail=0.025) {
       row = row + 1
     }
     row.names(covariance_parameters) = covar_names
-       
+    
     ## dropout time specific slopes
     slopes_by_dropout_time = data.frame(
       time=model.options$dropout.estimationTimes,
@@ -466,7 +466,7 @@ summary.dirichlet.fit <- function(fit, upper_tail=0.975, lower_tail=0.025) {
       slopes_by_dropout_time$ci_upper[time.index] = quantile(slope_sample, na.rm=TRUE, probs=upper_tail)
     }  
     row.names(slopes_by_dropout_time) = NULL
-
+    
     # build the summary list
     result.summary[[paste("group", group, sep="_")]] = list(
       total_clusters = total_clusters,
@@ -510,7 +510,7 @@ summary.dirichlet.fit <- function(fit, upper_tail=0.975, lower_tail=0.025) {
     
     result.summary$sigma.error = sigma_error_result
   }
-
+  
   return(result.summary)
   
 }
@@ -553,9 +553,12 @@ plot.trace.dirichlet.fit <- function (fit, type="expectation", groups=NULL, para
                                    ", group ", group_list[group_idx], sep=""))
       }
     }
-
+    
   } else if (type == "betas.covariates") {
     ### trace plot of covariate effects
+    if (is.null(fit$covariates.var)) {
+      stop("No covariates were included in the specified model fit")
+    }
     # determine which covariates to plot
     if (is.null(params)) {
       params_list <- fit$covariates.var
@@ -571,7 +574,7 @@ plot.trace.dirichlet.fit <- function (fit, type="expectation", groups=NULL, para
       ts.plot(sample, ylab=paste(params_list[i], " effect", sep=""))
     }
     
-  } else if (type == "nonEmptyClusters") {
+  } else if (type == "clusters") {
     ### trace plot of number of non-empty clusters
     for(i in 1:length(group_list)) {
       sample = unlist(lapply(fit$iterations, function(x) { 
@@ -583,50 +586,58 @@ plot.trace.dirichlet.fit <- function (fit, type="expectation", groups=NULL, para
   } else if (type == "covariance") {
     ### trace plot of covariance parameters
     if (is.null(params)) {
-      params <- c("dp.concentration")
+      params <- c("dp.dist.mu0", "dp.dist.sigma0", "dp.cluster.sigma", "dp.concentration")
       if (dist == "gaussian") {
         params <- c(params, "sigma.error")
       }
     }
-    # determine which covariance params are shared and which are group specific
-    group_params_list = vector()
-    shared_params_list = vector()
-    if ("dp.concentration" %in% params) {
-      group_params_list <- c("dp.concentration")
-    }
-    if (fit$dist == "gaussian" && "sigma.error" %in% params) {
-      if (!is.null(fit$model.options$sigma.error.perGroup) && fit$model.options$sigma.error.perGroup == TRUE) {
-        group_params_list <- c(group_params_list, "sigma.error")
-      } else {
-        shared_params_list <- c(shared_params_list, "sigma.error")
-      }
-    }
-    cat(group_params_list, "\n")
-    cat(shared_params_list, "\n")
-    # plot the group specific params
-    if (length(group_list) > 0) {
-      for(group_idx in 1:length(group_list)) {
-        group = group_list[group_idx]
-        for(param_idx in 1:length(group_params_list)) {
-          param = group_params_list[param_idx]
+    # plot group specific params
+    for(group_idx in 1:length(group_list)) {
+      group = group_list[group_idx]
+      # plot the complonents of the mean of the DP distribution
+      if ("dp.dist.mu0" %in% params) {
+        for(i in 1:3) {
+          group = group_list[group_idx]
           sample = unlist(lapply(fit$iterations, function(x) { 
-            return(x[[param]][[group_idx]])
+            return(x$dp.dist.mu0[[group_idx]][i])
           }))
-          ts.plot(sample, ylab=paste(param, ", group ", group, sep=""))
+          ts.plot(sample, ylab=paste("dp.dist.mu0[", i,"], group ", group, sep=""))
         }
       }
-    }
-    # plot the shared params
-    if (length(shared_params_list) > 0) {
-      for(param_idx in 1:length(shared_params_list)) {
-        param = shared_params_list[param_idx]
+      # plot the components of the covariance of the DP distribution and cluster covariance
+      for(param in c("dp.dist.sigma0", "dp.cluster.sigma")) {
+        if (param %in% params) {
+          for(i in 1:3) {
+            for(j in 1:3) {
+              sample = unlist(lapply(fit$iterations, function(x) { 
+                return(x[[param]][[group_idx]][i,j])
+              }))
+              ts.plot(sample, ylab=paste(param, "[", i, ",", j, "], group ", group, sep=""))
+            }
+          }
+        }
+      }
+      # plot the concentration param
+      if ("dp.concentration" %in% params) {
         sample = unlist(lapply(fit$iterations, function(x) { 
-          return(x[[param]])
+          return(x$dp.concentration[[group_idx]])
         }))
-        ts.plot(sample, ylab=param)
+        ts.plot(sample, ylab=paste("dp.concentration, group ", group, sep=""))
+      }
+      if (fit$model.options$sigma.error.perGroup && "sigma.error" %in% params) {
+        sample = unlist(lapply(fit$iterations, function(x) { 
+          return(x$sigma.error[[group_idx]])
+        }))
+        ts.plot(sample, ylab=paste("sigma.error, group ", group, sep=""))
       }
     }
-
+    if (!fit$model.options$sigma.error.perGroup && "sigma.error" %in% params) {
+      sample = unlist(lapply(fit$iterations, function(x) { 
+        return(x$sigma.error)
+      }))
+      ts.plot(sample, ylab="sigma.error")
+    }
+    
   } else {
     stop("Invalid type")
   }
@@ -647,7 +658,7 @@ plot.density.dirichlet.fit <- function (fit, name="slope") {
 #' plot the slope by dropout time
 plot.slopeByDropout.dirichlet.fit <- function (fit, group=1, xlim=NULL, ylim=NULL,
                                                lower_tail=0.025, upper_tail=0.975) {
-
+  
   slopes_by_dropout_time = data.frame(
     time=model.options$dropout.estimationTimes,
     mean=numeric(length(model.options$dropout.estimationTimes)),
@@ -878,7 +889,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     if (i %% model.options$print == 0) {
       print(paste("Dirichlet process model iteration = ", i, sep=""))
     }
-   
+    
     # make a copy of the previous iteration which will be modified as we move through the iteration
     model.current = model.previous
     
@@ -1229,7 +1240,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       
       
     } # END GROUP-SPECIFIC UPDATE LOOP
-
+    
     # combine the random effects for each group into complete arrays
     intercepts = vector()
     slopes = vector()
@@ -1239,8 +1250,8 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       slopes = c(slopes, rep(model.current$betas[[group.index]][,2], 
                              nobj.perGroup[[group.index]]))
     }
-
-        # update fixed effects associated with covariates
+    
+    # update fixed effects associated with covariates
     if (!is.null(covariates.var)) {
       if (dist == "gaussian") {
         sigma.error.inv = 1/model.current$sigma.error
@@ -1298,8 +1309,8 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
                   log(dmvnorm(as.vector(beta.covariates.star), as.vector(mu), covar)) +
                   log(dmvnorm(as.vector(beta.covariates.star), as.vector(model.options$betas.covariates.mu), model.options$betas.covariates.sigma)) -
                   log(dmvnorm(as.vector(model.current$betas.covariates), as.vector(model.options$betas.covariates.mu), model.options$betas.covariates.sigma)))
-                  
-                  
+        
+        
         
         if (rho > log(runif(1))) {
           model.current$betas.covariates = betaCovariates.star
