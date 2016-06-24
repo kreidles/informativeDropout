@@ -1184,7 +1184,7 @@ updateRandomEffects.binary <- function(numSubjects, numObservations, firstObsPer
   
   ratio <- (
     tapply(loglikelihood.star, ids, sum) +
-    dmvnorm(alpha.star.onePerSubject, c(0,0), sigma.alpha, log=TRUE) - 
+      dmvnorm(alpha.star.onePerSubject, c(0,0), sigma.alpha, log=TRUE) - 
       (tapply(loglikelihood.previous, ids, sum) + 
          dmvnorm(alpha.onePerSubject, c(0,0), sigma.alpha, log=TRUE))
   )
@@ -1622,7 +1622,7 @@ summary.bayes.splines.fit <- function(fit) {
   ))
   row.names(acceptance_probabilities) = c(
     "knot.add", "knot.remove", "knot.move", "fixedEffects", "fixedEffectsCovariates"
-    )
+  )
   result.summary$acceptance_probabilities = acceptance_probabilities
   
   return(result.summary)
