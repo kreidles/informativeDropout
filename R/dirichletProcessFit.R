@@ -149,7 +149,7 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
 #' @param betas.covariates.sigma Prior covariance for the covariate regression coefficients
 #' @param sigma.error Prior for the residual error (Gaussian outcomes only)
 #' @param sigma.error.tau Hyperprior for the residual error (Gaussian outcomes only)
-#' 
+#' @param sigma.error.perGroup If TRUE, separate sigma error parameters will be fit per group
 #' @importFrom matrixcalc is.positive.definite
 #' 
 #' @export dirichlet.model.options
@@ -173,7 +173,8 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=1, print=
                                     betas.covariates.mu = NULL,
                                     betas.covariates.sigma = NULL,
                                     sigma.error = NULL,
-                                    sigma.error.tau = NULL) {
+                                    sigma.error.tau = NULL,
+                                    sigma.error.perGroup = FALSE) {
   
   # validate the mcmc options
   if (is.na(iterations) || iterations <= 1) {
@@ -298,8 +299,10 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=1, print=
     
     # residual error (Gaussian outcomes only)
     sigma.error = sigma.error,
-    sigma.error.tau = sigma.error.tau
+    sigma.error.tau = sigma.error.tau,
     
+    # indicator for per group sigma error parameters
+    sigma.error.perGroup = sigma.error.perGroup
   )
   
   class(opts) <- append(class(opts), "dirichlet.model.options")
@@ -347,7 +350,7 @@ dirichlet.fit <- function(model.options, dist, groups, covariates.var, iteration
 #'
 #' @export summary.dirichlet.fit
 #' 
-summary.dirichlet.fit <- function(fit) {
+summary.dirichlet.fit <- function(fit, upper_tail=0.975, lower_tail=0.025) {
   if (length(fit$iterations) <= 0) {
     stop("No results found in Dirichlet model fit")
   }
@@ -380,35 +383,70 @@ summary.dirichlet.fit <- function(fit) {
     subject_specific_effects = data.frame(
       mean=c(mean(expected_slope_sample),mean(expected_intercept_sample)),
       median=c(median(expected_slope_sample), median(expected_intercept_sample)),
-      ci_lower=c(quantile(expected_slope_sample, probs=0.025),
-                 quantile(expected_intercept_sample, probs=0.025)),
-      ci_upper=c(quantile(expected_slope_sample, probs=0.975),
-                 quantile(expected_intercept_sample, probs=0.975))
+      ci_lower=c(quantile(expected_slope_sample, probs=lower_tail),
+                 quantile(expected_intercept_sample, probs=lower_tail)),
+      ci_upper=c(quantile(expected_slope_sample, probs=upper_tail),
+                 quantile(expected_intercept_sample, probs=upper_tail))
       )
     row.names(subject_specific_effects) = c("slope", "intercept")
     
     ## covariance parameters
-    param_list = c("dp.dist.mu0",           
-                   "dp.dist.sigma0", "dp.cluster.sigma",
-                   "dp.concentration")
+    total_covar = 16 + ifelse(!is.null(fit$model.options$sigma.error.perGroup) &&
+                                fit$model.options$sigma.error.perGroup == TRUE, 1, 0)
     covariance_parameters = data.frame(
-      mean=numeric(length(param_list)),
-      median=numeric(length(param_list)),
-      ci_lower=numeric(length(param_list)),
-      ci_upper=numeric(length(param_list))
+      mean=numeric(total_covar),
+      median=numeric(total_covar),
+      ci_lower=numeric(total_covar),
+      ci_upper=numeric(total_covar)
     )
     row = 1
+    covar_names <- vector()
+    # summarize each component of the mean of the DP distribution
+    for(i in 1:3) {
+      covar_names = c(covar_names, paste("dp.dist.mu0[", i, "]", sep=""))
+      param_sample <- unlist(lapply(iterations, function(x) { 
+        return(x$dp.dist.mu0[[group.index]][i])
+      }))
+      covariance_parameters$mean[row] = mean(param_sample)
+      covariance_parameters$median[row] = median(param_sample)
+      covariance_parameters$ci_lower[row] = quantile(param_sample, probs=lower_tail)
+      covariance_parameters$ci_upper[row] = quantile(param_sample, probs=upper_tail)
+      row = row + 1
+    }
+    # summarize the covariance matrices (just the upper triangle)
+    for(param in c("dp.dist.sigma0", "dp.cluster.sigma")) {
+      for(i in 1:3) {
+        for(j in i:3) {
+          covar_names = c(covar_names, paste(param, "[", i, ",", j, "]", sep=""))
+          param_sample <- unlist(lapply(iterations, function(x) { 
+            return(x[[param]][[group.index]][i,j])
+          }))
+          covariance_parameters$mean[row] = mean(param_sample)
+          covariance_parameters$median[row] = median(param_sample)
+          covariance_parameters$ci_lower[row] = quantile(param_sample, probs=lower_tail)
+          covariance_parameters$ci_upper[row] = quantile(param_sample, probs=upper_tail)
+          row = row + 1
+        }
+      }
+    }
+    # summarize the remaining group specific params
+    param_list = c("dp.concentration")
+    if (fit$dist == "gaussian" && !is.null(fit$model.options$sigma.error.perGroup) &&
+        fit$model.options$sigma.error.perGroup == TRUE) {
+      param_list = c(param_list, "sigma.error")
+    }
     for (param in param_list) {
+      covar_names = c(covar_names, param)
       param_sample <- unlist(lapply(iterations, function(x) { 
         return(x[[param]][[group.index]])
       }))
       covariance_parameters$mean[row] = mean(param_sample)
       covariance_parameters$median[row] = median(param_sample)
-      covariance_parameters$ci_lower[row] = quantile(param_sample, probs=0.025)
-      covariance_parameters$ci_upper[row] = quantile(param_sample, probs=0.975)
+      covariance_parameters$ci_lower[row] = quantile(param_sample, probs=lower_tail)
+      covariance_parameters$ci_upper[row] = quantile(param_sample, probs=upper_tail)
       row = row + 1
     }
-    row.names(covariance_parameters) = param_list
+    row.names(covariance_parameters) = covar_names
        
     ## dropout time specific slopes
     slopes_by_dropout_time = data.frame(
@@ -424,8 +462,8 @@ summary.dirichlet.fit <- function(fit) {
       }))
       slopes_by_dropout_time$mean[time.index] = mean(slope_sample)
       slopes_by_dropout_time$median[time.index] = median(slope_sample)
-      slopes_by_dropout_time$ci_lower[time.index] = quantile(slope_sample, na.rm=TRUE, probs=0.025)
-      slopes_by_dropout_time$ci_upper[time.index] = quantile(slope_sample, na.rm=TRUE, probs=0.975)
+      slopes_by_dropout_time$ci_lower[time.index] = quantile(slope_sample, na.rm=TRUE, probs=lower_tail)
+      slopes_by_dropout_time$ci_upper[time.index] = quantile(slope_sample, na.rm=TRUE, probs=upper_tail)
     }  
     row.names(slopes_by_dropout_time) = NULL
 
@@ -438,8 +476,6 @@ summary.dirichlet.fit <- function(fit) {
     )
   }
   
-  ## TODO for gaussian outcomes, summarize sigma.error
-  
   ## summarize covariate effects
   if (!is.null(covariates.var)) {
     num_covariates = length(covariates.var)
@@ -451,22 +487,24 @@ summary.dirichlet.fit <- function(fit) {
       }))
       covariate_effects$mean[i] = mean(beta_covariate_sample)
       covariate_effects$median[i] = median(beta_covariate_sample)
-      covariate_effects$ci_lower[i] = quantile(beta_covariate_sample, probs=0.025)
-      covariate_effects$ci_upper[i] = quantile(beta_covariate_sample, probs=0.975)
+      covariate_effects$ci_lower[i] = quantile(beta_covariate_sample, probs=lower_tail)
+      covariate_effects$ci_upper[i] = quantile(beta_covariate_sample, probs=upper_tail)
     }
     row.names(covariate_effects) <- covariates.var
     result.summary$covariate_effects = covariate_effects
   }
   
-  if (dist == "gaussian") {
+  if (dist == "gaussian" && 
+      (is.null(fit$model.options$sigma.error.perGroup) || 
+       fit$model.options$sigma.error.perGroup == FALSE)) {
     sigma_error_sample = unlist(lapply(iterations, function(x) { 
       return(x$sigma.error)
     }))
     sigma_error_result = data.frame(
       mean = mean(sigma_error_sample),
       median = median(sigma_error_sample),
-      ci_lower = quantile(sigma_error_sample, probs=0.025),
-      ci_upper = quantile(sigma_error_sample, probs=0.975)
+      ci_lower = quantile(sigma_error_sample, probs=lower_tail),
+      ci_upper = quantile(sigma_error_sample, probs=upper_tail)
     )
     row.names(sigma_error_result) = "sigma.error"
     
@@ -482,7 +520,7 @@ summary.dirichlet.fit <- function(fit) {
 #' Produce a trace plot of the specified variable in Dirichlet model fit
 #' 
 #' @param fit the Dirichlet model fit 
-#' @param variable the variable to plot
+#' @param type the type of information to plot.  
 #' @param group (optional) the group to plot.  If not specified, separate plots will
 #'    be produced for each group
 #'
@@ -512,7 +550,7 @@ plot.trace.dirichlet.fit <- function (fit, type="expectation", groups=NULL, para
           return(x[[varname]][[group_idx]])
         }))
         ts.plot(sample, ylab=paste("Expected ", params_list[param_idx],
-                                   " for Group ", group_list[group_idx], sep=""))
+                                   ", group ", group_list[group_idx], sep=""))
       }
     }
 
@@ -530,7 +568,7 @@ plot.trace.dirichlet.fit <- function (fit, type="expectation", groups=NULL, para
         index = which(fit$covariates == params_list[i])
         return(x$betas.covariates[[index]])
       }))
-      ts.plot(sample, ylab=paste("Covariate Effect", params_list[i], sep=": "))
+      ts.plot(sample, ylab=paste(params_list[i], " effect", sep=""))
     }
     
   } else if (type == "nonEmptyClusters") {
@@ -539,30 +577,53 @@ plot.trace.dirichlet.fit <- function (fit, type="expectation", groups=NULL, para
       sample = unlist(lapply(fit$iterations, function(x) { 
         return(sum(as.numeric(x$cluster.N[[i]] > 0)))
       }))
-      ts.plot(sample, ylab=paste("Non-Empty Clusters for Group", group_list[i], sep=" "))
+      ts.plot(sample, ylab=paste("Total Non-Empty Clusters, Group", group_list[i], sep=" "))
     }
     
   } else if (type == "covariance") {
     ### trace plot of covariance parameters
-    # determine which covariance parameters to plot
     if (is.null(params)) {
-      if (fit$dist == "gaussian") {
-        params_list <- c("dp.concentration", "sigma.error" )
-      } else {
-        params_list <- c("dp.concentration")
+      params <- c("dp.concentration")
+      if (dist == "gaussian") {
+        params <- c(params, "sigma.error")
       }
-    } else {
-      params_list <- params
     }
-    
-    for(group_idx in 1:length(group_list)) {
-      group = group_list[group_idx]
-      for(param_idx in 1:length(params_list)) {
-        param = params_list[param_idx]
+    # determine which covariance params are shared and which are group specific
+    group_params_list = vector()
+    shared_params_list = vector()
+    if ("dp.concentration" %in% params) {
+      group_params_list <- c("dp.concentration")
+    }
+    if (fit$dist == "gaussian" && "sigma.error" %in% params) {
+      if (!is.null(fit$model.options$sigma.error.perGroup) && fit$model.options$sigma.error.perGroup == TRUE) {
+        group_params_list <- c(group_params_list, "sigma.error")
+      } else {
+        shared_params_list <- c(shared_params_list, "sigma.error")
+      }
+    }
+    cat(group_params_list, "\n")
+    cat(shared_params_list, "\n")
+    # plot the group specific params
+    if (length(group_list) > 0) {
+      for(group_idx in 1:length(group_list)) {
+        group = group_list[group_idx]
+        for(param_idx in 1:length(group_params_list)) {
+          param = group_params_list[param_idx]
+          sample = unlist(lapply(fit$iterations, function(x) { 
+            return(x[[param]][[group_idx]])
+          }))
+          ts.plot(sample, ylab=paste(param, ", group ", group, sep=""))
+        }
+      }
+    }
+    # plot the shared params
+    if (length(shared_params_list) > 0) {
+      for(param_idx in 1:length(shared_params_list)) {
+        param = shared_params_list[param_idx]
         sample = unlist(lapply(fit$iterations, function(x) { 
-          return(x[[param]][[group_idx]])
+          return(x[[param]])
         }))
-        ts.plot(sample, ylab=paste("Covariance parameter ", param, " for Group ", group, sep=""))
+        ts.plot(sample, ylab=param)
       }
     }
 
@@ -584,7 +645,8 @@ plot.density.dirichlet.fit <- function (fit, name="slope") {
 #' plot.slopeByDropout.dirichlet.fit
 #' 
 #' plot the slope by dropout time
-plot.slopeByDropout.dirichlet.fit <- function (fit, group=1, xlim=NULL, ylim=NULL) {
+plot.slopeByDropout.dirichlet.fit <- function (fit, group=1, xlim=NULL, ylim=NULL,
+                                               lower_tail=0.025, upper_tail=0.975) {
 
   slopes_by_dropout_time = data.frame(
     time=model.options$dropout.estimationTimes,
@@ -599,8 +661,8 @@ plot.slopeByDropout.dirichlet.fit <- function (fit, group=1, xlim=NULL, ylim=NUL
     }))
     slopes_by_dropout_time$mean[time.index] = mean(slope_sample)
     slopes_by_dropout_time$median[time.index] = median(slope_sample)
-    slopes_by_dropout_time$ci_lower[time.index] = quantile(slope_sample, probs=0.025)
-    slopes_by_dropout_time$ci_upper[time.index] = quantile(slope_sample, probs=0.975)
+    slopes_by_dropout_time$ci_lower[time.index] = quantile(slope_sample, probs=lower_tail)
+    slopes_by_dropout_time$ci_upper[time.index] = quantile(slope_sample, probs=upper_tail)
   }  
   row.names(slopes_by_dropout_time) = NULL
   
