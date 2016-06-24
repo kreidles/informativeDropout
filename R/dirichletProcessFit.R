@@ -488,37 +488,88 @@ summary.dirichlet.fit <- function(fit) {
 #'
 #' @export plot.trace.dirichlet.fit
 #' 
-plot.trace.dirichlet.fit <- function (fit, type="expectation", name="slope", group=1) {
+plot.trace.dirichlet.fit <- function (fit, type="expectation", groups=NULL, params=NULL) {
+  # determine the groups to plot
+  if (is.null(groups)) {
+    group_list <- fit$groups
+  } else {
+    group_list = groups
+  }
+  
   if (type == "expectation") {
-    varname = paste("expected", name, sep=".")
-    sample = unlist(lapply(fit$iterations, function(x) { 
-      return(x[[varname]][[group]])
-    }))
-  } else if (type == "betas.covariates") {
-    index = which(fit$covariates == name)
-    if (length(index) <= 0) {
-      stop("Invalid covariate")
+    ### trace plot of expected slopes and intercepts
+    # determine the parameters to plot
+    if (is.null(params)) {
+      params_list <- c("slope", "intercept")
+    } else {
+      params_list <- params
     }
-    sample = unlist(lapply(fit$iterations, function(x) { 
-      return(x[[type]][[index]])
-    }))
-  } else if (type == "dp.concentration") {
-    sample = unlist(lapply(fit$iterations, function(x) { 
-      return(x[[type]][[group]])
-    }))
-  } else if (type == "sigma.error") {
-    sample = unlist(lapply(fit$iterations, function(x) { 
-      return(x[[type]])
-    }))
-  } else if (type == "slope.dropoutTimes") {
-    sample = unlist(lapply(fit$iterations, function(x) { 
-      return(x[[type]][[group]][[name]])
-    }))
+    
+    for(group_idx in 1:length(group_list)) {
+      for(param_idx in 1:length(params_list)) {
+        varname = paste("expected", params_list[param_idx], sep=".")
+        sample = unlist(lapply(fit$iterations, function(x) { 
+          return(x[[varname]][[group_idx]])
+        }))
+        ts.plot(sample, ylab=paste("Expected ", params_list[param_idx],
+                                   " for Group ", group_list[group_idx], sep=""))
+      }
+    }
+
+  } else if (type == "betas.covariates") {
+    ### trace plot of covariate effects
+    # determine which covariates to plot
+    if (is.null(params)) {
+      params_list <- fit$covariates.var
+    } else {
+      params_list <- params
+    }
+    
+    for(i in 1:length(params_list)) {
+      sample = unlist(lapply(fit$iterations, function(x) { 
+        index = which(fit$covariates == params_list[i])
+        return(x$betas.covariates[[index]])
+      }))
+      ts.plot(sample, ylab=paste("Covariate Effect", params_list[i], sep=": "))
+    }
+    
+  } else if (type == "nonEmptyClusters") {
+    ### trace plot of number of non-empty clusters
+    for(i in 1:length(group_list)) {
+      sample = unlist(lapply(fit$iterations, function(x) { 
+        return(sum(as.numeric(x$cluster.N[[i]] > 0)))
+      }))
+      ts.plot(sample, ylab=paste("Non-Empty Clusters for Group", group_list[i], sep=" "))
+    }
+    
+  } else if (type == "covariance") {
+    ### trace plot of covariance parameters
+    # determine which covariance parameters to plot
+    if (is.null(params)) {
+      if (fit$dist == "gaussian") {
+        params_list <- c("dp.concentration", "sigma.error" )
+      } else {
+        params_list <- c("dp.concentration")
+      }
+    } else {
+      params_list <- params
+    }
+    
+    for(group_idx in 1:length(group_list)) {
+      group = group_list[group_idx]
+      for(param_idx in 1:length(params_list)) {
+        param = params_list[param_idx]
+        sample = unlist(lapply(fit$iterations, function(x) { 
+          return(x[[param]][[group_idx]])
+        }))
+        ts.plot(sample, ylab=paste("Covariance parameter ", param, " for Group ", group, sep=""))
+      }
+    }
+
   } else {
     stop("Invalid type")
   }
-
-  ts.plot(sample)
+  
 }
 
 #' plot.density.dirichlet.fit

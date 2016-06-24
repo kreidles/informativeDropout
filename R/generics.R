@@ -26,22 +26,34 @@
 # Register some S3 generic methods for summarizing the fit object
 #
 
-# trace plot for a parameter
+#'
+#'  trace plot for a parameter
+#'  
+#'  @export
 plot.trace <- function (x, ...) {
   UseMethod("plot.trace", x)
 }
 
-# density plot for a parameter
+#'
+#'  density plot for a parameter
+#'  
+#'  @export
 plot.density <- function (x, ...) {
   UseMethod("plot.density", x)
 }
 
-# plot the slope by dropout time
+#'
+#' plot the slope by dropout time
+#'  
+#'  @export
 plot.slopeByDropout <- function (x, ...) {
   UseMethod("plot.slopeByDropout", x)
 }
 
-# perform sensitivity analysis on the slope results
+#'
+#' perform sensitivity analysis on the slope results
+#'  
+#'  @export
 sensitivity <- function(x, ...) {
   # delta factor is multiplier on slope after dropout
   # y = int + drop * slope + (time - dropout) * delta * slope

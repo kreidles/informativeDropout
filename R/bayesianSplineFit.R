@@ -1474,6 +1474,85 @@ prob.acceptance <- function(fit, action) {
   return(total_accepts/length(iterations))
 }
 
+#' Create a trace plot of the specified parameter
+#'
+#' @param fit bayes.splines.fit object from an informativeDropout run.
+#'
+#' @export plot.trace.bayes.splines.fit
+#' 
+plot.trace.bayes.splines.fit <- function (fit, type="marginal_slope", groups=NULL,
+                                          params=NULL) {
+  if (is.null(groups)) {
+    group_list <- fit$groups
+  } else {
+    group_list = groups
+  }
+  
+  if (type == "marginal_slope") {
+    ### trace plot of marginal slopes
+    for(i in 1:length(group_list)) {
+      sample = unlist(lapply(fit$iterations, function(x) { 
+        return(x$slope.marginal[[i]])
+      }))
+      ts.plot(sample, ylab=paste("Marginal Slope for Group", group_list[i], sep=" "))
+    }
+
+  } else if (type == "betas.covariates") {
+    ### trace plot of covariate effects
+    # determine which covariates to plot
+    if (is.null(params)) {
+      params_list <- fit$covariates.var
+    } else {
+      params_list <- params
+    }
+    
+    for(i in 1:length(params_list)) {
+      sample = unlist(lapply(fit$iterations, function(x) { 
+        index = which(fit$covariates == params_list[i])
+        return(x$betas.covariates[[index]])
+      }))
+      ts.plot(sample, ylab=paste("Covariate Effect", params_list[i], sep=": "))
+    }
+
+  } else if (type == "knots") {
+    ### trace plot of number of knots
+    for(i in 1:length(group_list)) {
+      sample = unlist(lapply(fit$iterations, function(x) { 
+        return(length(x$knots[[i]]))
+      }))
+      ts.plot(sample, ylab=paste("Knot Count for Group", group_list[i], sep=" "))
+    }
+    
+  } else if (type == "covariance") {
+    ### trace plot of covariance parameters
+    # determine which covariance parameters to plot
+    if (is.null(params)) {
+      if (dist == "gaussian") {
+        params_list <- c("sigma.randomIntercept",
+                         "sigma.randomSlope","sigma.randomInterceptSlope",
+                         "sigma.error" )
+      } else {
+        params_list <- c("sigma.randomIntercept",
+                         "sigma.randomSlope","sigma.randomInterceptSlope")
+      }
+      
+    } else {
+      params_list <- params
+    }
+    
+    for(i in 1:length(params_list)) {
+      param = params_list[i]
+      sample = unlist(lapply(fit$iterations, function(x) { 
+        return(x[[param]])
+      }))
+      ts.plot(sample, ylab=paste("Covariance parameter", params_list[i], sep=": "))
+    }
+  } else {
+    stop("Invalid type")
+  }
+  
+}
+
 
 #' Summarize a Bayesian spline model run
 #'
