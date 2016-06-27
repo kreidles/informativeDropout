@@ -856,11 +856,20 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   
   # for Gaussian outcomes, the residual error
   if (dist == "gaussian") {
-    sigma.error = model.options$sigma.error
+    if (is.null(model.options$sigma.error)) {
+      rep_length = ifelse(model.options$sigma.error.perGroup, length(groupList),1)
+      sigma.error = rep(1, rep_length)
+    } else {
+      if (model.options$sigma.error.perGroup &&
+          length(model.options$sigma.error) != length(groupList)) {
+        stop("Prior options error :: you must specify a sigma.error value for each group")
+      }
+      sigma.error = model.options$sigma.error
+    }
   } else {
     sigma.error = NULL
   }
-  
+
   # initialize the first model iteration
   iterations.saved = ceiling((model.options$iterations - model.options$burnin) / model.options$thin)
   modelIterationList <- vector(mode = "list", length = iterations.saved)
@@ -909,6 +918,13 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       group.dp.dist.mu0 = model.current$dp.dist.mu0[[group.index]]
       group.dp.dist.sigma0 = model.current$dp.dist.sigma0[[group.index]]
       group.dp.cluster.sigma = model.current$dp.cluster.sigma[[group.index]]
+      if (dist == "gaussian") {
+        group.sigma.error = ifelse(model.options$sigma.error.perGroup, 
+                                   model.current$sigma.error[[group.index]],
+                                   model.current$sigma.error)
+      } else {
+        group.sigma.error = NULL
+      }
       
       # calculate the overall probability of belonging to a cluster (length = #clusters)
       cumulative.weights.conditional <- cumprod(1 - group.weights.conditional)
@@ -1010,7 +1026,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         
         if (dist == 'gaussian') {
           ## calculate the posterior mean and variance for the random intercept
-          posterior.var = 1 / ((1 / prior.var) + (group.nobs[group.cluster.assignments==h] / model.current$sigma.error))
+          posterior.var = 1 / ((1 / prior.var) + (group.nobs[group.cluster.assignments==h] / group.sigma.error))
           
           # calculate the posterior mean
           if (is.null(covariates.var)) {
@@ -1027,7 +1043,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
           }
           posterior.mean = (posterior.var * 
                               ((prior.mean/prior.var) + 
-                                 ((1/sigma.error) * 
+                                 ((1/group.sigma.error) * 
                                     tapply(randomInts, data.currentCluster[, ids.var],sum)))) 
           # draw the random intercepts
           group.betas[group.cluster.assignments == h, 1] = 
@@ -1083,7 +1099,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
           posterior.var = 1 / ((1 / prior.var) + 
                                  (tapply(data.currentCluster[, times.observation.var]^2, 
                                          data.currentCluster[, ids.var], sum) / 
-                                    sigma.error))
+                                    group.sigma.error))
           # calculate the posterior mean
           if (is.null(covariates.var)) {
             randomSlopes = (data.currentCluster[, times.observation.var]) * 
@@ -1099,7 +1115,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
           }
           posterior.mean = (posterior.var * 
                               ((prior.mean/prior.var) + 
-                                 ((1/sigma.error) * 
+                                 ((1/group.sigma.error) * 
                                     tapply(randomSlopes, data.currentCluster[, ids.var],sum)))) 
           # draw the random intercepts
           group.betas[group.cluster.assignments == h, 2] = 
@@ -1238,6 +1254,20 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       model.current$expected.slope[[group.index]] = 
         sum(group.weights.mixing * model.current$cluster.mu[[group.index]][,2])
       
+      if (dist == "gaussian" && model.options$sigma.error.perGroup) {
+        ## TODO: remove group specific variables, use betas (random effects)
+        # Step 9 Update sigma.error with inverse gamma
+        group.intercepts = rep(model.current$betas[[group.index]][,1], nobj.perGroup[[group.index]])
+        group.slopes = rep(model.current$betas[[group.index]][,2], nobj.perGroup[[group.index]])
+        residual = group.data[, outcomes.var] - (group.intercepts + group.data[, times.observation.var] * group.slopes)
+        if (!is.null(covariates.var)) {
+          residual = residual - as.vector(as.matrix(group.data[,covariates.var]) %*% 
+                                            matrix(model.current$betas.covariates))
+        }
+        g <- model.options$sigma.error.tau + crossprod(residual)/2
+        tau <- rgamma(1, model.options$sigma.error.tau + n.total / 2, g)
+        model.current$sigma.error[[group.index]] = 1 / tau
+      }
       
     } # END GROUP-SPECIFIC UPDATE LOOP
     
@@ -1254,7 +1284,12 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     # update fixed effects associated with covariates
     if (!is.null(covariates.var)) {
       if (dist == "gaussian") {
-        sigma.error.inv = 1/model.current$sigma.error
+        if (model.options$sigma.error.perGroup && length(groupList) > 1) {
+          sigma.error.inv = 1/mean(unlist(model.current$sigma.error))
+        } else {
+          sigma.error.inv = 1/model.current$sigma.error
+        }
+        
         prior.sigma.inv = solve(model.options$betas.covariates.sigma)
         
         residuals = data[, outcomes.var] - intercepts - slopes * data[, times.observation.var]
@@ -1318,7 +1353,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       }
     }
     
-    if (dist == "gaussian") {
+    if (dist == "gaussian" && !model.options$sigma.error.perGroup) {
       ## TODO: remove group specific variables, use betas (random effects)
       # Step 9 Update sigma.error with inverse gamma
       residual = data[, outcomes.var] - (intercepts + data[, times.observation.var] * slopes)
