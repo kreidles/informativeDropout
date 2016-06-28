@@ -149,7 +149,6 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
 #' @param betas.covariates.sigma Prior covariance for the covariate regression coefficients
 #' @param sigma.error Prior for the residual error (Gaussian outcomes only)
 #' @param sigma.error.tau Hyperprior for the residual error (Gaussian outcomes only)
-#' @param sigma.error.perGroup If TRUE, separate sigma error parameters will be fit per group
 #' @importFrom matrixcalc is.positive.definite
 #' 
 #' @export dirichlet.model.options
@@ -173,8 +172,7 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=1, print=
                                     betas.covariates.mu = NULL,
                                     betas.covariates.sigma = NULL,
                                     sigma.error = NULL,
-                                    sigma.error.tau = NULL,
-                                    sigma.error.perGroup = FALSE) {
+                                    sigma.error.tau = NULL) {
   
   # validate the mcmc options
   if (is.na(iterations) || iterations <= 1) {
@@ -299,10 +297,8 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=1, print=
     
     # residual error (Gaussian outcomes only)
     sigma.error = sigma.error,
-    sigma.error.tau = sigma.error.tau,
+    sigma.error.tau = sigma.error.tau
     
-    # indicator for per group sigma error parameters
-    sigma.error.perGroup = sigma.error.perGroup
   )
   
   class(opts) <- append(class(opts), "dirichlet.model.options")
@@ -391,8 +387,7 @@ summary.dirichlet.fit <- function(fit, upper_tail=0.975, lower_tail=0.025) {
     row.names(subject_specific_effects) = c("slope", "intercept")
     
     ## covariance parameters
-    total_covar = 16 + ifelse(!is.null(fit$model.options$sigma.error.perGroup) &&
-                                fit$model.options$sigma.error.perGroup == TRUE, 1, 0)
+    total_covar = 16
     covariance_parameters = data.frame(
       mean=numeric(total_covar),
       median=numeric(total_covar),
@@ -429,23 +424,17 @@ summary.dirichlet.fit <- function(fit, upper_tail=0.975, lower_tail=0.025) {
         }
       }
     }
-    # summarize the remaining group specific params
-    param_list = c("dp.concentration")
-    if (fit$dist == "gaussian" && !is.null(fit$model.options$sigma.error.perGroup) &&
-        fit$model.options$sigma.error.perGroup == TRUE) {
-      param_list = c(param_list, "sigma.error")
-    }
-    for (param in param_list) {
-      covar_names = c(covar_names, param)
-      param_sample <- unlist(lapply(iterations, function(x) { 
-        return(x[[param]][[group.index]])
-      }))
-      covariance_parameters$mean[row] = mean(param_sample)
-      covariance_parameters$median[row] = median(param_sample)
-      covariance_parameters$ci_lower[row] = quantile(param_sample, probs=lower_tail)
-      covariance_parameters$ci_upper[row] = quantile(param_sample, probs=upper_tail)
-      row = row + 1
-    }
+    # add the DP concentration parameter
+    covar_names <- c(covar_names, "dp.concentration")
+    concentration_sample <- unlist(lapply(iterations, function(x) { 
+      return(x$dp.concentration[[group.index]])
+    }))
+    covariance_parameters$mean[row] = mean(param_sample)
+    covariance_parameters$median[row] = median(param_sample)
+    covariance_parameters$ci_lower[row] = quantile(param_sample, probs=lower_tail)
+    covariance_parameters$ci_upper[row] = quantile(param_sample, probs=upper_tail)
+    row = row + 1
+    # set the row names for the covariance param data frame
     row.names(covariance_parameters) = covar_names
     
     ## dropout time specific slopes
@@ -494,9 +483,8 @@ summary.dirichlet.fit <- function(fit, upper_tail=0.975, lower_tail=0.025) {
     result.summary$covariate_effects = covariate_effects
   }
   
-  if (dist == "gaussian" && 
-      (is.null(fit$model.options$sigma.error.perGroup) || 
-       fit$model.options$sigma.error.perGroup == FALSE)) {
+  if (dist == "gaussian") {
+    # for gaussian outcomes, summarize the error variance
     sigma_error_sample = unlist(lapply(iterations, function(x) { 
       return(x$sigma.error)
     }))
@@ -507,7 +495,6 @@ summary.dirichlet.fit <- function(fit, upper_tail=0.975, lower_tail=0.025) {
       ci_upper = quantile(sigma_error_sample, probs=upper_tail)
     )
     row.names(sigma_error_result) = "sigma.error"
-    
     result.summary$sigma.error = sigma_error_result
   }
   
@@ -624,14 +611,8 @@ plot.trace.dirichlet.fit <- function (fit, type="expectation", groups=NULL, para
         }))
         ts.plot(sample, ylab=paste("dp.concentration, group ", group, sep=""))
       }
-      if (fit$model.options$sigma.error.perGroup && "sigma.error" %in% params) {
-        sample = unlist(lapply(fit$iterations, function(x) { 
-          return(x$sigma.error[[group_idx]])
-        }))
-        ts.plot(sample, ylab=paste("sigma.error, group ", group, sep=""))
-      }
     }
-    if (!fit$model.options$sigma.error.perGroup && "sigma.error" %in% params) {
+    if (dist == "gaussian" && "sigma.error" %in% params) {
       sample = unlist(lapply(fit$iterations, function(x) { 
         return(x$sigma.error)
       }))
@@ -739,6 +720,9 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   if (dist == 'gaussian') {
     if (is.null(model.options$sigma.error.tau)) {
       stop("Prior options error :: invalid tau (hyperparameter) for the error variance")
+    }
+    if (is.null(model.options$sigma.error) || model.options$sigma.error <= 0) {
+      stop("Prior options error :: invalid sigma.error")
     }
   }
   
@@ -856,16 +840,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   
   # for Gaussian outcomes, the residual error
   if (dist == "gaussian") {
-    if (is.null(model.options$sigma.error)) {
-      rep_length = ifelse(model.options$sigma.error.perGroup, length(groupList),1)
-      sigma.error = rep(1, rep_length)
-    } else {
-      if (model.options$sigma.error.perGroup &&
-          length(model.options$sigma.error) != length(groupList)) {
-        stop("Prior options error :: you must specify a sigma.error value for each group")
-      }
-      sigma.error = model.options$sigma.error
-    }
+    sigma.error = model.options$sigma.error
   } else {
     sigma.error = NULL
   }
@@ -918,13 +893,6 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       group.dp.dist.mu0 = model.current$dp.dist.mu0[[group.index]]
       group.dp.dist.sigma0 = model.current$dp.dist.sigma0[[group.index]]
       group.dp.cluster.sigma = model.current$dp.cluster.sigma[[group.index]]
-      if (dist == "gaussian") {
-        group.sigma.error = ifelse(model.options$sigma.error.perGroup, 
-                                   model.current$sigma.error[[group.index]],
-                                   model.current$sigma.error)
-      } else {
-        group.sigma.error = NULL
-      }
       
       # calculate the overall probability of belonging to a cluster (length = #clusters)
       cumulative.weights.conditional <- cumprod(1 - group.weights.conditional)
@@ -1026,7 +994,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         
         if (dist == 'gaussian') {
           ## calculate the posterior mean and variance for the random intercept
-          posterior.var = 1 / ((1 / prior.var) + (group.nobs[group.cluster.assignments==h] / group.sigma.error))
+          posterior.var = 1 / ((1 / prior.var) + (group.nobs[group.cluster.assignments==h] / model.current$sigma.error))
           
           # calculate the posterior mean
           if (is.null(covariates.var)) {
@@ -1043,7 +1011,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
           }
           posterior.mean = (posterior.var * 
                               ((prior.mean/prior.var) + 
-                                 ((1/group.sigma.error) * 
+                                 ((1/model.current$sigma.error) * 
                                     tapply(randomInts, data.currentCluster[, ids.var],sum)))) 
           # draw the random intercepts
           group.betas[group.cluster.assignments == h, 1] = 
@@ -1099,7 +1067,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
           posterior.var = 1 / ((1 / prior.var) + 
                                  (tapply(data.currentCluster[, times.observation.var]^2, 
                                          data.currentCluster[, ids.var], sum) / 
-                                    group.sigma.error))
+                                    model.current$sigma.error))
           # calculate the posterior mean
           if (is.null(covariates.var)) {
             randomSlopes = (data.currentCluster[, times.observation.var]) * 
@@ -1115,7 +1083,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
           }
           posterior.mean = (posterior.var * 
                               ((prior.mean/prior.var) + 
-                                 ((1/group.sigma.error) * 
+                                 ((1/model.current$sigma.error) * 
                                     tapply(randomSlopes, data.currentCluster[, ids.var],sum)))) 
           # draw the random intercepts
           group.betas[group.cluster.assignments == h, 2] = 
@@ -1254,21 +1222,6 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       model.current$expected.slope[[group.index]] = 
         sum(group.weights.mixing * model.current$cluster.mu[[group.index]][,2])
       
-      if (dist == "gaussian" && model.options$sigma.error.perGroup) {
-        ## TODO: remove group specific variables, use betas (random effects)
-        # Step 9 Update sigma.error with inverse gamma
-        group.intercepts = rep(model.current$betas[[group.index]][,1], nobj.perGroup[[group.index]])
-        group.slopes = rep(model.current$betas[[group.index]][,2], nobj.perGroup[[group.index]])
-        residual = group.data[, outcomes.var] - (group.intercepts + group.data[, times.observation.var] * group.slopes)
-        if (!is.null(covariates.var)) {
-          residual = residual - as.vector(as.matrix(group.data[,covariates.var]) %*% 
-                                            matrix(model.current$betas.covariates))
-        }
-        g <- model.options$sigma.error.tau + crossprod(residual)/2
-        tau <- rgamma(1, model.options$sigma.error.tau + n.total / 2, g)
-        model.current$sigma.error[[group.index]] = 1 / tau
-      }
-      
     } # END GROUP-SPECIFIC UPDATE LOOP
     
     # combine the random effects for each group into complete arrays
@@ -1284,12 +1237,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     # update fixed effects associated with covariates
     if (!is.null(covariates.var)) {
       if (dist == "gaussian") {
-        if (model.options$sigma.error.perGroup && length(groupList) > 1) {
-          sigma.error.inv = 1/mean(unlist(model.current$sigma.error))
-        } else {
-          sigma.error.inv = 1/model.current$sigma.error
-        }
-        
+        sigma.error.inv = 1/model.current$sigma.error
         prior.sigma.inv = solve(model.options$betas.covariates.sigma)
         
         residuals = data[, outcomes.var] - intercepts - slopes * data[, times.observation.var]
@@ -1353,7 +1301,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       }
     }
     
-    if (dist == "gaussian" && !model.options$sigma.error.perGroup) {
+    if (dist == "gaussian") {
       ## TODO: remove group specific variables, use betas (random effects)
       # Step 9 Update sigma.error with inverse gamma
       residual = data[, outcomes.var] - (intercepts + data[, times.observation.var] * slopes)
