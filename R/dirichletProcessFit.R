@@ -730,6 +730,19 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   ## reorder the data and cache information on the groups and subjects
   # number of clusters
   n.clusters <- model.options$n.clusters
+  
+  # if no group is specified, create a bogus column with a single group value, 
+  # making sure it doesn't already appear in the data set
+  if (is.null(groups.var)) {
+    groups.var <- "generated_group_0"
+    idx <- 1
+    while(groups.var %in% names(data)) {
+      groups.var = paste("generated_group_", idx, collapse="")
+      idx <- idx + 1
+    }
+    data[,groups.var] = rep(1, nrow(data))
+  }
+  
   # reorder by group, subject, and observation time
   data <- data[order(data[,groups.var], data[,ids.var], data[,times.observation.var]),]
   rownames(data) <- NULL
