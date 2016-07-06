@@ -149,6 +149,11 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
 #' @param betas.covariates.sigma Prior covariance for the covariate regression coefficients
 #' @param sigma.error Prior for the residual error (Gaussian outcomes only)
 #' @param sigma.error.tau Hyperprior for the residual error (Gaussian outcomes only)
+#' @param density.intercept.domain vector of values at which to calculate the density of the random intercepts. If
+#' NULL, no density will be calculated
+#' @param density.slope.domain vector of values at which to calculate the density of the random slopes.  If NULL,
+#' no density will be calculated
+#' 
 #' @importFrom matrixcalc is.positive.definite
 #' 
 #' @export dirichlet.model.options
@@ -172,7 +177,9 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=1, print=
                                     betas.covariates.mu = NULL,
                                     betas.covariates.sigma = NULL,
                                     sigma.error = NULL,
-                                    sigma.error.tau = NULL) {
+                                    sigma.error.tau = NULL,
+                                    density.intercept.domain = NULL,
+                                    density.slope.domain = NULL) {
   
   # validate the mcmc options
   if (is.na(iterations) || iterations <= 1) {
@@ -297,7 +304,11 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=1, print=
     
     # residual error (Gaussian outcomes only)
     sigma.error = sigma.error,
-    sigma.error.tau = sigma.error.tau
+    sigma.error.tau = sigma.error.tau,
+    
+    # density domains
+    density.intercept.domain = density.intercept.domain,
+    density.slope.domain = density.slope.domain
     
   )
   
@@ -857,7 +868,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
   } else {
     sigma.error = NULL
   }
-
+  
   # initialize the first model iteration
   iterations.saved = ceiling((model.options$iterations - model.options$burnin) / model.options$thin)
   modelIterationList <- vector(mode = "list", length = iterations.saved)
@@ -1184,21 +1195,28 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       
       ### calculate per-group summary statistics
       #Estimate Density of Slope - for plotting density of the random slope (output only)  
-      domain <-seq(-4,4,0.01)
-      sim.slope = vector()
-      sim.int = vector()
-      for (h in 1:n.clusters) {
-        sim.int <-rbind(sim.int,
-                        (clusterProbabilities[h] * 
-                           dnorm(domain, model.current$cluster.mu[[group.index]][h,1], 
-                                 sqrt(model.current$dp.dist.sigma0[[group.index]][1,1]))))
-        sim.slope <-rbind(sim.slope,
+      if (!is.null(model.options$density.intercept.domain)) {
+        sim.int = vector()
+        for(h in 1:n.clusters) {
+          sim.int <-rbind(sim.int,
                           (clusterProbabilities[h] * 
-                             dnorm(domain, model.current$cluster.mu[[group.index]][h,2], 
-                                   sqrt(model.current$dp.dist.sigma0[[group.index]][2,2]))))
+                             dnorm(model.options$density.intercept.domain, 
+                                   model.current$cluster.mu[[group.index]][h,1], 
+                                   sqrt(model.current$dp.dist.sigma0[[group.index]][1,1]))))
+        }
+        model.current$density.intercept[[group.index]] <- colSums(sim.int)
       }
-      model.current$density.intercept[[group.index]] <- colSums(sim.int)
-      model.current$density.slope[[group.index]] <- colSums(sim.slope)
+      if (!is.null(model.options$density.slope.domain)) {
+        sim.slope = vector()
+        for (h in 1:n.clusters) {
+          sim.slope <-rbind(sim.slope,
+                            (clusterProbabilities[h] * 
+                               dnorm(model.options$density.slope.domain, 
+                                     model.current$cluster.mu[[group.index]][h,2], 
+                                     sqrt(model.current$dp.dist.sigma0[[group.index]][2,2]))))
+        }
+        model.current$density.slope[[group.index]] <- colSums(sim.slope)
+      }
       
       # Equation 19 
       #Estimate slope at each dropout time
