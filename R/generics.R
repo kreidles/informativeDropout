@@ -49,7 +49,7 @@ plot.density <- function (fit, ...) {
 #' @param fit the model fit object
 #' @export  
 plot.slopeByDropout <- function (fit, ...) {
-  UseMethod("plot.slopeByDropout", x)
+  UseMethod("plot.slopeByDropout", fit)
 }
 
 #' perform sensitivity analysis on the slope results
@@ -62,7 +62,7 @@ sensitivity <- function(fit, ...) {
   # arguments: min/max times, list of estimation times, 
   # multiple deltas
   # vector of covariate values by time
-  UseMethod("sensitivity.slope")
+  UseMethod("sensitivity.slope", fit)
 }
 
 #'

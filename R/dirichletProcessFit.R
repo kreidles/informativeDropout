@@ -647,32 +647,84 @@ plot.density.dirichlet.fit <- function (fit, name="slope") {
 
 #' plot.slopeByDropout.dirichlet.fit
 #' 
-#' plot the slope by dropout time
-plot.slopeByDropout.dirichlet.fit <- function (fit, group=1, xlim=NULL, ylim=NULL,
-                                               lower_tail=0.025, upper_tail=0.975) {
+#' Plot the slope by dropout time for a Dirichlet Model fit
+#' 
+#' @param fit the Dirichlet model fit 
+#' @param groups list of groups to include in the plot(s) 
+#' @param xlim the limits of the X-axis
+#' @param ylim the limits of the Y-axis
+#' @param show_ci if TRUE, displays the upper and lower credible interval
+#' @param overlay if TRUE, overlays all groups on the same plot
+#' @param lower_tail the lower tail probability for the credible interval
+#' @param upper_tail the upper tail probability for the credible interval
+#' @param colors vector of colors for each group
+#'
+#' @export plot.slopeByDropout.dirichlet.fit
+#' 
+plot.slopeByDropout.dirichlet.fit <- function (fit, groups=NULL, xlim=NULL, ylim=NULL,
+                                               show_ci = TRUE, overlay=TRUE,
+                                               lower_tail=0.025, upper_tail=0.975,
+                                               colors=NULL) {
+  model.options = fit$model.options
+  if (is.null(groups)) {
+    groups = fit$groups
+  }
+  if (is.null(colors)) {
+    colors = c("black", rainbow(length(groups)-1))
+  }
   
   slopes_by_dropout_time = data.frame(
-    time=model.options$dropout.estimationTimes,
-    mean=numeric(length(model.options$dropout.estimationTimes)),
-    median=numeric(length(model.options$dropout.estimationTimes)),
-    ci_lower=numeric(length(model.options$dropout.estimationTimes)),
-    ci_upper=numeric(length(model.options$dropout.estimationTimes))
+    group = as.vector(sapply(groups, function(group) { 
+      return (rep(group,length(model.options$dropout.estimationTimes))) 
+    })),
+    time=rep(model.options$dropout.estimationTimes, length(groups)),
+    mean=numeric(length(model.options$dropout.estimationTimes) * length(groups)),
+    median=numeric(length(model.options$dropout.estimationTimes) * length(groups)),
+    ci_lower=numeric(length(model.options$dropout.estimationTimes) * length(groups)),
+    ci_upper=numeric(length(model.options$dropout.estimationTimes) * length(groups))
   )
-  for (time.index in 1:(length(model.options$dropout.estimationTimes))) {
-    slope_sample <- unlist(lapply(fit$iterations, function(x) { 
-      return(x$slope.dropoutTimes[[group]][time.index])
-    }))
-    slopes_by_dropout_time$mean[time.index] = mean(slope_sample)
-    slopes_by_dropout_time$median[time.index] = median(slope_sample)
-    slopes_by_dropout_time$ci_lower[time.index] = quantile(slope_sample, probs=lower_tail)
-    slopes_by_dropout_time$ci_upper[time.index] = quantile(slope_sample, probs=upper_tail)
-  }  
+  
+  for(group.index in 1:length(groups)) {
+    for (time.index in 1:(length(model.options$dropout.estimationTimes))) {
+      slope_sample <- unlist(lapply(fit$iterations, function(x) { 
+        return(x$slope.dropoutTimes[[group.index]][time.index])
+      }))
+      offset = (group.index-1)*length(model.options$dropout.estimationTimes)
+      slopes_by_dropout_time$mean[time.index + offset] = mean(slope_sample)
+      slopes_by_dropout_time$median[time.index + offset] = median(slope_sample)
+      slopes_by_dropout_time$ci_lower[time.index + offset] = quantile(slope_sample, probs=lower_tail)
+      slopes_by_dropout_time$ci_upper[time.index + offset] = quantile(slope_sample, probs=upper_tail)
+    }  
+  }
+  
   row.names(slopes_by_dropout_time) = NULL
   
-  plot(slopes_by_dropout_time$time, slopes_by_dropout_time$mean, "l", xlim=xlim, ylim=ylim,
-       xlab="Dropout time", ylab="Expected Slope")
-  lines(slopes_by_dropout_time$time, slopes_by_dropout_time$ci_lower, "l", lty=3)
-  lines(slopes_by_dropout_time$time, slopes_by_dropout_time$ci_upper, "l", lty=3)
+  if (overlay) {
+    for(group.index in 1:length(groups)) {
+      group.color = colors[(group.index %% length(colors))+1]
+      group.slopes_by_dropout_time = slopes_by_dropout_time[slopes_by_dropout_time$group==groups[group.index],]
+      if (group.index == 1) {
+        plot(group.slopes_by_dropout_time$time, group.slopes_by_dropout_time$mean, "l", xlim=xlim, ylim=ylim,
+             xlab="Dropout time", ylab="Expected Slope", col=group.color)
+      } else {
+        lines(group.slopes_by_dropout_time$time, group.slopes_by_dropout_time$mean, col=group.color)
+      }
+      if (show_ci) {
+        lines(group.slopes_by_dropout_time$time, group.slopes_by_dropout_time$ci_lower, "l", lty=3, col=group.color)
+        lines(group.slopes_by_dropout_time$time, group.slopes_by_dropout_time$ci_upper, "l", lty=3, col=group.color)
+      }
+    }
+  } else {
+    for(group.index in 1:length(groups)) {
+      group.color = colors[(group.index %% length(colors))+1]
+      group.slopes_by_dropout_time = slopes_by_dropout_time[slopes_by_dropout_time$group==groups[group.index],]
+      plot(group.slopes_by_dropout_time$time, group.slopes_by_dropout_time$mean, "l", xlim=xlim, ylim=ylim,
+           xlab="Dropout time", ylab=paste("Expected Slope (group ", groups[group.index], ")", sep=""),
+           col=group.color)
+      lines(group.slopes_by_dropout_time$time, group.slopes_by_dropout_time$ci_lower, "l", lty=3, col=group.color)
+      lines(group.slopes_by_dropout_time$time, group.slopes_by_dropout_time$ci_upper, "l", lty=3, col=group.color)
+    }
+  }
 }
 
 # perform sensitivity analysis on the slope results

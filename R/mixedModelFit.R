@@ -49,11 +49,28 @@ informativeDropout.mixed <- function(data, ids.var, outcomes.var, groups.var,
     stop("Model options error :: options must be of type mixed.model.options")
   }
   
+  if (!is.null(groups.var)) {
+    
+  }
+  knots = model.options$knots
   # get the coefficients for the knots
-  
+#   
+#   formula.string <- paste(
+#     paste(outcomes.var, "~"),
+#     ns
+#     paste("ns(", times.dropout.var, ", knots=c(", paste(knots.interior, collapse=",", Boundary.knots=knots.boundary,
+#        "intercept=T)" 
+#     
+#     paste(
+#       paste(covariates.var, collapse=" + "), 
+#       paste("(1+", times.observation.var, "|", ids.var, ")", sep=""),
+#       sep = " + "),
+#     sep=" ")
+#   
   
   if (dist == "gaussian") {
-    fit = lme
+    fit = lmer(as.formula(formula.string), data=data, REML=FALSE)
+    
   } else {
     
   }

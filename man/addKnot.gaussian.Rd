@@ -4,9 +4,9 @@
 \alias{addKnot.gaussian}
 \title{addKnot.gaussian}
 \usage{
-addKnot.gaussian(model.options, knots.previous, outcomes, times.dropout,
-  times.observation, covariates, X.previous, Theta.previous, Z, alpha,
-  betaCovariates, sigma.error)
+addKnot.gaussian(model.options, knots.previous, knots.positions.candidate,
+  outcomes, times.dropout, times.observation, covariates, X.previous,
+  Theta.previous, Z, alpha, betaCovariates, sigma.error)
 }
 \arguments{
 \item{model.options}{model options}

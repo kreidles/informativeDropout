@@ -4,7 +4,7 @@
 \alias{sensitivity}
 \title{perform sensitivity analysis on the slope results}
 \usage{
-sensitivity(fit, ...)
+sensitivity(fit, times.estimation = NULL, deltas = NULL)
 }
 \arguments{
 \item{fit}{the model fit object}
