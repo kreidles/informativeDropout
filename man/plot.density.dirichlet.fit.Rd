@@ -4,9 +4,24 @@
 \alias{plot.density.dirichlet.fit}
 \title{plot.density.dirichlet.fit}
 \usage{
-\method{plot}{density.dirichlet.fit}(fit, name = "slope")
+\method{plot}{density.dirichlet.fit}(fit, params = NULL, groups = NULL,
+  overlay = TRUE, xlim = NULL, ylim = NULL, colors = NULL, lty = 1)
+}
+\arguments{
+\item{fit}{the Dirichlet model fit}
+
+\item{params}{the vector indicating the values to plot (either "density.intercept" or
+"density.slope")}
+
+\item{groups}{list of groups to include in the plot(s)}
+
+\item{xlim}{the limits of the X-axis}
+
+\item{ylim}{the limits of the Y-axis}
+
+\item{colors}{vector of colors for each group}
 }
 \description{
-density plot for a parameter
+Plot the densities of the random effects for a Dirichlet Process model
 }
 
