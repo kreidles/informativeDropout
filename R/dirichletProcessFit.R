@@ -638,11 +638,103 @@ plot.trace.dirichlet.fit <- function (fit, type="expectation", groups=NULL, para
 
 #' plot.density.dirichlet.fit
 #' 
-#' density plot for a parameter
-plot.density.dirichlet.fit <- function (fit, name="slope") {
-  # take mean at each point across the iterations
-  # histogram the means
+#' Plot the densities of the random effects for a Dirichlet Process model
+#' 
+#' @param fit the Dirichlet model fit 
+#' @param params the vector indicating the values to plot (either "density.intercept" or
+#' "density.slope")
+#' @param groups list of groups to include in the plot(s) 
+#' @param xlim the limits of the X-axis
+#' @param ylim the limits of the Y-axis
+#' @param colors vector of colors for each group
+#'
+#' @export plot.slopeByDropout.bayes.splines.fit
+#' 
+plot.density.dirichlet.fit <- function (fit, params=NULL, groups=NULL, overlay=TRUE,
+                                        xlim=NULL, ylim=NULL, colors=NULL, lty=1) {
+  
+  model.options = fit$model.options
+  
+  if (is.null(params)) {
+    params = c("density.intercept", "density.slope")
+  }
+  if (is.null(groups)) {
+    groups = fit$groups
+  }
+  if (is.null(colors)) {
+    colors = c("black", rainbow(length(groups)-1))
+  }
+  
+  result = list()
+  if ("density.intercept" %in% params && !is.null(model.options$density.intercept.domain)) {
+    
+    for(group.index in 1:length(groups)) {
+      group.data <- data.frame(Reduce(rbind, lapply(fit$iterations, function(x) {
+        return(x$density.intercept[[group.index]])
+      })), row.names=NULL)
+      
+      if (group.index == 1) {
+        density.intercept = data.frame(value=colMeans(group.data))
+      } else {
+        density.intercept <- cbind(density.intercept, colMeans(group.data))
+      }
+      
+    }
+    names(density.intercept) <- groups
+    result$density.intercept = density.intercept
+  }
+  
+  if ("density.slope" %in% params && !is.null(model.options$density.slope.domain)) {
+    
+    for(group.index in 1:length(groups)) {
+      group.data <- data.frame(Reduce(rbind, lapply(fit$iterations, function(x) {
+        return(x$density.slope[[group.index]])
+      })), row.names=NULL)
+      
+      if (group.index == 1) {
+        density.slope = data.frame(value=colMeans(group.data))
+      } else {
+        density.slope <- cbind(density.slope, colMeans(group.data))
+      }
+      
+    }
+    names(density.slope) <- groups
+    result$density.slope = density.slope
+  }
+  
+  if (!is.null(result$density.intercept)) {
+    for(group.index in 1:length(groups)) {
+      ylab = ifelse(overlay || length(groups)==1, "Density", paste("Density (group ", group, ")", sep=""))
+      group = groups[group.index]
+      group.color = colors[(group.index %% length(colors))+1]
+      group.intercept = as.vector(result$density.intercept[,group.index])
+      if (group.index == 1 || !overlay) {
+        plot(model.options$density.intercept.domain, group.intercept, "l", col=group.color,
+             ylab=ylab, xlab="Intercept", lty=lty)
+      } else {
+        lines(model.options$density.intercept.domain, group.intercept, col=group.color, lty=lty)
+      }
+    }
+  }
+  if (!is.null(result$density.slope)) {
+    for(group.index in 1:length(groups)) {
+      ylab = ifelse(overlay || length(groups)==1, "Density", paste("Density (group ", group, ")", sep=""))
+      group = groups[group.index]
+      group.color = colors[(group.index %% length(colors))+1]
+      group.slope = as.vector(result$density.slope[,group.index])
+      if (group.index == 1 || !overlay) {
+        plot(model.options$density.slope.domain, group.slope, "l", col=group.color,
+             ylab=ylab, xlab="Slope", lty=lty)
+      } else {
+        lines(model.options$density.slope.domain, group.slope, col=group.color, lty=lty)
+      }
+    }
+  }
+  
+  return(result)
+  
 }
+
 
 
 #' plot.slopeByDropout.dirichlet.fit
