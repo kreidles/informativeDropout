@@ -819,9 +819,12 @@ plot.slopeByDropout.dirichlet.fit <- function (fit, groups=NULL, xlim=NULL, ylim
   }
 }
 
-# perform sensitivity analysis on the slope results
-sensitivity.slope <- function(x, ...) {
-  UseMethod("sensitivity.slope")
+#' perform sensitivity analysis on the estimated slopes
+#' 
+#' 
+#' 
+sensitivity.dirichlet.fit <- function(fit, times, deltas) {
+  
 }
 
 
@@ -1098,7 +1101,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       model.current$weights.conditional[[group.index]] = sapply(1:(n.clusters), function(h) {
         if (h < n.clusters) {
           return(rbeta(1, 1 + group.cluster.N[h], 
-                       model.options$dp.concentration + 
+                       model.current$dp.concentration[[group.index]] + 
                          sum(group.cluster.N[(h+1):n.clusters])))
         } else {
           return(1)
@@ -1118,7 +1121,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       # now draw the new concentration parameter for the Dirichlet process
       model.current$dp.concentration[[group.index]] <- 
         ((pi.eta * rgamma(1, model.options$dp.concentration.alpha + numNonEmptyClusters, 
-                          model.options$sigma.error.tau - log(eta))) + 
+                          model.options$dp.concentration.beta - log(eta))) + 
            ((1 - pi.eta) * rgamma(1, model.options$dp.concentration.alpha + numNonEmptyClusters - 1, 
                                   model.options$dp.concentration.beta - log(eta))))
       
@@ -1322,7 +1325,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         m <- var %*% (Sb.inv %*% model.options$dp.dist.mu0.mb + 
                         dp.dist.sigma0.inv %*% ((model.current$cluster.mu[[group.index]][group.cluster.N > 0,])) )
       } else {
-        m <- var %*% (model.options$dp.dist.mu0.Sb %*% model.options$dp.dist.mu0.mb + 
+        m <- var %*% (Sb.inv %*% model.options$dp.dist.mu0.mb + 
                         dp.dist.sigma0.inv %*% (colSums(model.current$cluster.mu[[group.index]][group.cluster.N > 0,])) )
       }
       model.current$dp.dist.mu0[[group.index]] = as.vector(rmvnorm(1,m,var))
