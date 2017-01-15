@@ -25,30 +25,34 @@
 # load the data set
 data(hiv)
 data <- hiv
-
+#data <- data[data$hard==0,]
 # set the model options
-model.options <- bayes.splines.model.options(iterations=100, burnin=10, thin=1, print=1,
-                                             knots.prob.birth=0.5, knots.min=3, knots.max=10, knots.stepSize=3,
-                                             knots.positions.start=c(330,550,1060), 
-                                             knots.positions.candidate=seq(10,max(data$day),10),
-                                             dropout.estimationTimes=c(1,2,3),
-                                             sigma.error=1,
-                                             sigma.error.shape.tau=0.001, sigma.error.rate.tau=0.001,
-                                             sigma.beta=1, lambda.numKnots=1,
-                                             sigma.residual=1,
-                                               sigma.randomIntercept = 1,
-                                               sigma.randomSlope = 1,
-                                               sigma.randomInterceptSlope = 0,
-                                             sigma.randomEffects.df = 3,
-                                             sigma.randomEffects.scale = diag(2))
+model.options <- bayes.splines.model.options(
+  iterations=500, burnin=0, thin=1, print=100,
+  knots.prob.birth=0.2, knots.min=1, knots.max=10, knots.stepSize=30,
+  knots.positions.start=list(c(142, 562, 982, 1402, 1822), c(139, 559, 979, 1399, 1819)),
+  knots.positions.candidate=list(seq(142,1826,15),seq(139,1819,15)),
+  dropout.estimationTimes=c(1,2,3),
+  sigma.error=1,
+  sigma.error.shape.tau=0.001, sigma.error.rate.tau=0.001,
+  sigma.beta=25, lambda.numKnots=5,
+  sigma.residual=1.25^2,
+  sigma.randomIntercept = 1,
+  sigma.randomSlope = 1,
+  sigma.randomInterceptSlope = 0,
+  sigma.randomEffects.df = 3,
+  sigma.randomEffects.scale = diag(2))
 
 # select columns to include in the model
 ids.var = "WIHSID"
 outcomes.var = "logcd4"
 groups.var = "hard"
-covariates.var = c("AGEATBL", "minority")
+#groups.var=NULL
+data$timebaselogcd4 = data$baselogcd4 * data$years
+covariates.var = c("baselogcd4", "timebaselogcd4")
+#covariates.var = NULL
 times.dropout.var = "drop"
-times.observation.var = "day"
+times.observation.var = "years"
 
 # set the model fitting method
 method="bayes.splines"
@@ -61,7 +65,7 @@ set.seed(1066)
 # fit the model
 fit = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
                          times.dropout.var, times.observation.var, 
-                         method, dist, model.options)  
+                         method, dist, model.options) 
 
 # summarize the result
 summary(fit)
