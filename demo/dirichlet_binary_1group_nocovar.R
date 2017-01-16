@@ -54,7 +54,7 @@ model.options=dirichlet.model.options(iterations=100, n.clusters=15, burnin=0, p
 # Set the columns to be used in the model
 ids.var = "patid"
 outcomes.var = "yi_bin"
-groups.var = "group"
+groups.var = NULL
 covariates.var = NULL
 times.dropout.var = "drop"
 times.observation.var = "t"

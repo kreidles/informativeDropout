@@ -49,12 +49,14 @@ model.options=dirichlet.model.options(iterations=100, n.clusters=15, burnin=0, p
                                       betas.covariates.mu = NULL,
                                       betas.covariates.sigma = NULL,
                                       sigma.error = 1,
-                                      sigma.error.tau = 0.01)
+                                      sigma.error.tau = 0.01,
+                                      density.intercept.domain = seq(-4,4,0.01),
+                                      density.slope.domain = seq(-4,4,0.01))
 
 # Set the columns to be used in the model
 ids.var = "patid"
 outcomes.var = "yi"
-groups.var = "group"
+groups.var = NULL 
 covariates.var = NULL
 times.dropout.var = "drop"
 times.observation.var = "t"

@@ -90,6 +90,7 @@ bayes.splines.iteration <- function(knots=NULL, Theta=NULL, betas.covariates=NUL
 #' @param knots.min minimum number of knots in the model. Must be greater than or equal to 1.
 #' @param knots.max maximum number of knots in the model.
 #' 
+#' @importFrom matrixcalc is.positive.definite
 #' @export bayes.splines.model.options
 #' 
 bayes.splines.model.options = function(iterations=10000, burnin=500, thin=1, print=1,
@@ -145,6 +146,17 @@ bayes.splines.model.options = function(iterations=10000, burnin=500, thin=1, pri
     stop("Prior options error :: sigma.randomEffects.scale must be a positive definite matrix")
   }
   
+  # in the 1 group case, we let people pass in a vector of knots, but the
+  # model fits are expected a list of vectors
+  knots.start = knots.positions.start
+  if (!is.list(knots.start)) {
+    knots.start = list(knots.start)
+  }
+  knots.candidate = knots.positions.candidate
+  if (!is.list(knots.candidate)) {
+    knots.candidate = list(knots.candidate)
+  }
+  
   opts = list(
     # mcmc iterations
     iterations = iterations,
@@ -163,9 +175,9 @@ bayes.splines.model.options = function(iterations=10000, burnin=500, thin=1, pri
     # step size for moving a knot 
     knots.stepSize = knots.stepSize,
     # starting positions for the knots
-    knots.positions.start = knots.positions.start,
+    knots.positions.start = knots.start,
     # candidate positions for the knots
-    knots.positions.candidate = knots.positions.candidate,
+    knots.positions.candidate = knots.candidate,
     # minimum/maximum probability for Metropolis Hastings for binary outcomes
     # these control numeric instability with taking logs
     prob.min = prob.min,
@@ -514,8 +526,8 @@ removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dro
   Theta.LSresid <- Theta.previous - Theta.LSXprev
   
   # update the coefficients
-  residual.deletedKnot <- Theta.LSresid[index]
-  Theta.star <- Theta.LSXstar + Theta.LSresid[-index]
+  residual.deletedKnot <- Theta.LSresid[index+1]
+  Theta.star <- Theta.LSXstar + Theta.LSresid[-(index+1)]
   
   
   # calculate the previous eta and associated probability
@@ -616,8 +628,8 @@ removeKnot.gaussian <- function(model.options, knots.previous,
   Theta.LSXstar <- ginv(crossprod(X.star))%*%(crossprod(X.star, yls))
   Theta.LSresid <- Theta.previous - Theta.LSXprev
   # update the coefficients
-  residual.deletedKnot <- Theta.LSresid[index]
-  Theta.star <- Theta.LSXstar + Theta.LSresid[-index]
+  residual.deletedKnot <- Theta.LSresid[index+1]
+  Theta.star <- Theta.LSXstar + Theta.LSresid[-(index+1)]
   
   # Calculate residuals for likelihood ratio
   if (!is.null(covariates)) {
@@ -697,6 +709,10 @@ moveKnot.binary <- function(model.options, knots.previous, knots.candidates,
     p <- sample(potentialLocations,1)
     # get the new knots
     knots.star <- sort(c(knotsToKeep, p))
+    # get the potential locations we could move back to, from the proposed knot positions
+    potentialLocations = knots.positions.candidate[! knots.positions.candidate %in% knots.star]
+    potentialLocations.star <- potentialLocations[potentialLocations > (p - knots.stepSize) & 
+                                                    potentialLocations < (p + knots.stepSize)] 
     
     if (length(knots.star) > 1) {
       knotstar.b <- range(knots.star)
@@ -734,7 +750,7 @@ moveKnot.binary <- function(model.options, knots.previous, knots.candidates,
     loglikelihood.star <- sum(log((1 - prob.star[outcomes==0]))) + sum(log(prob.star[outcomes==1]))    
     
     # Calculate the acceptance probability
-    rho <- (log(length(potentialLocations)) - log(length(knots.star)) + loglikelihood.star - loglikelihood.previous)
+    rho <- (log(length(potentialLocations)) - log(length(potentialLocations.star)) + loglikelihood.star - loglikelihood.previous)
     if (rho > log(runif(1))) {
       return (list(knots=knots.star, X=X.star, proposed=TRUE, accepted=TRUE))
     } else {
@@ -789,6 +805,10 @@ moveKnot.gaussian <- function(model.options, knots.previous, knots.positions.can
     p <- sample(potentialLocations,1)
     # get the new knots
     knots.star <- sort(c(knotsToKeep, p))
+    # get the potential locations we could move back to, from the proposed knot positions
+    potentialLocations = knots.positions.candidate[! knots.positions.candidate %in% knots.star]
+    potentialLocations.star <- potentialLocations[potentialLocations > (p - knots.stepSize) & 
+                                                    potentialLocations < (p + knots.stepSize)] 
     
     if (length(knots.star) > 1) {
       knotstar.b <- range(knots.star)
@@ -819,7 +839,7 @@ moveKnot.gaussian <- function(model.options, knots.previous, knots.positions.can
     }
     
     # Calculate the acceptance probability
-    rho <- (log(length(potentialLocations)) - log(length(knots.star)) + 
+    rho <- (log(length(potentialLocations)) - log(length(potentialLocations.star)) + 
               (crossprod(LRresid.prev)-crossprod(LRresid.star))/2/sigma.error)
     if (rho > log(runif(1))) {
       return (list(knots=knots.star, X=X.star, proposed=TRUE, accepted=TRUE))
@@ -1631,6 +1651,8 @@ plot.slopeByDropout.bayes.splines.fit <- function (fit, groups=NULL, xlim=NULL, 
       lines(group.slopes_by_dropout_time$time, group.slopes_by_dropout_time$ci_upper, "l", lty=3, col=group.color)
     }
   }
+  
+  return(slopes_by_dropout_time)
 }
 
 

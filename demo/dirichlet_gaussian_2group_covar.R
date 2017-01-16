@@ -50,7 +50,9 @@ model.options=dirichlet.model.options(iterations=100, n.clusters=60, burnin=0, t
                                       betas.covariates.mu = c(0,0),
                                       betas.covariates.sigma = 100*diag(2),
                                       sigma.error = 1,
-                                      sigma.error.tau = 0.001)
+                                      sigma.error.tau = 0.001, 
+                                      density.slope.domain = seq(-4,4,0.1),
+                                      density.intercept.domain = seq(-4,4,0.1))
 
 
 # define the columns in the data set to be used in the model

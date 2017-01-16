@@ -44,7 +44,9 @@ model.options=dirichlet.model.options(iterations=100, n.clusters=15, burnin=0,
                                       betas.covariates = NULL,
                                       betas.covariates.mu = 0,
                                       betas.covariates.sigma = matrix(0.7),
-                                      sigma.error.tau = 0.01)
+                                      sigma.error.tau = 0.01,
+                                      density.slope.domain = seq(-4,4,0.1),
+                                      density.intercept.domain = seq(-4,4,0.1))
 
 
 # set the columns to use in the model
