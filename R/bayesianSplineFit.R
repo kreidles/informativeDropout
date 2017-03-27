@@ -1667,8 +1667,14 @@ plot.slopeByDropout.bayes.splines.fit <- function (fit, groups=NULL, xlim=NULL, 
 }
 
 
-
-sensitivity <- function(fit, times.estimation=NULL, deltas=NULL) {
+#'
+#'
+#'
+#'
+#'
+sensitivity.bayes.splines.fit <- function(fit, times.estimation, deltas, 
+                                          data.onePerSubject, times.dropout.var, group.var, 
+                                          covariates.time.var=NULL, covariates.notime.var=NULL) {
   if (is.null(fit) || !is(fit, "bayes.splines.fit")) {
     stop("Invalid model fit - must be of class bayes.splines.fit")
   }
@@ -1682,19 +1688,137 @@ sensitivity <- function(fit, times.estimation=NULL, deltas=NULL) {
     stop("No slope deltas specified")
   }
   
+  # make sure data.covariates is a data frame
+  
+  ## TODO:
+  # - make data and data.covar one per subject
+  
   dist = fit$dist
   model.options = fit$model.options
   iterations = fit$iterations
-  groups = fit$groups
+  group_list = fit$groups
   covariates.var = fit$covariates.var
   
-  times.deltas = expand.grid(times.estimation, deltas)
-  names(times.deltas) <- c("time", "delta")
+  groups = data.onePerSubject[,group.var]
+  times.dropout = data.onePerSubject[,times.dropout.var]
   
-  for(i in 1:nrow(times.deltas)) {
+  # calculate pre dropout slopes for each group
+  preDropout.info = lapply(1:length(group_list), function(group_index) {
+    group = group_list[group_index]
+    data.group = data.onePerSubject[data.onePerSubject[,group.var]==group,]
+    data.group.covar.time = NULL
+    if (!is.null(covariates.time.var)) {
+      data.group.covar.time  = subset(data.group,select=covariates.time.var)
+    }
+    data.group.covar.nontime = NULL
+    if (!is.null(covariates.nontime.var)) {
+      data.group[,covariates.nontime.var]
+    }
+    times.dropout.group = data.group[[times.dropout.var]]
+    timeZero = matrix(rep(NA, nrow(data.group) * length(iterations)), 
+                      nrow = nrow(data.group))
+    preDropoutSlope = matrix(rep(NA, nrow(data.group) * length(iterations)), 
+                             nrow = nrow(data.group))
     
-  }
+    
+    for(i in 1:length(iterations)) {
+      
+      Theta = iterations[[i]]$Theta[[group_index]]
+      Theta_int = Theta[1]
+      Theta_noint = Theta[-1]
+      knots = iterations[[i]]$knots[[group_index]]
+      betas.covariates.time = NULL
+      if (!is.null(covariates.time.var)) {
+        betas.covariates.time = iterations[[i]]$betas.covariates[which(covariates.var == covariates.time.var)]
+      }
+      betas.covariates.nontime = NULL
+      if (!is.null(covariates.nontime.var)) {
+        betas.covariates.nontime = iterations[[i]]$betas.covariates[which(covariates.var == covariates.nontime.var)]
+      }
+      knots.boundary = range(knots)
+      knots.interior = knots[-c(1,length(knots))] 
+      
+      spline <- ns(times.dropout.group, knots = knots.interior, Boundary.knots = knots.boundary, intercept=T)
+
+      preDropoutSlope[, i] = (
+        spline %*% Theta_noint + 
+          ifelse(!is.null(betas.covariates.time), as.matrix(data.group[,covariates.time.var]) %*% betas.covariates.time, 0)
+      )
+      # intercept plus non-time interacted covariates
+      timeZero[, i] = (
+        Theta_int + 
+          ifelse(!is.null(betas.covariates.nontime), as.matrix(data.group.covar.nontime) %*% betas.covariates.nontime, 0)
+      )
+    }
+    
+    return(list(group=group, slope=preDropoutSlope, timeZero=timeZero))
+  })
+  
+  sensitivity.info = lapply(1:length(group_list), function(group_index) {
+    group = group_list[group_index]
+    data.group = data.onePerSubject[data.onePerSubject[,group.var]==group,]
+    times.dropout.group = data.group[[times.dropout.var]]
+    preDropout.info.group = preDropout.info[[group_index]]
+    times.drop.matrix = matrix(times.dropout.group,nrow=nrow(preDropout.info.group$slope),ncol=length(iterations),byrow=FALSE)
+
+    result = list(group=group_list[group_index])
+    for(delta in deltas) {
+      for(time in times.estimation) {
+      
+        cat(time, " ", delta, "\n")
+        
+        # for each iteration, calculate expected y across subjects
+        # if dropout before time, use post drop slope, else pre drop
+        expected_y = apply(preDropout.info.group$timeZero + 
+                             ifelse(times.drop.matrix > time, preDropout.info.group$slope, 
+                                    (preDropout.info.group$slope * delta * (times.drop.matrix - time) + preDropout.info.group$slope * times.drop.matrix)/time), 2, mean)
+        result[[paste("delta_", delta, sep="", collapse="")]][[paste("time_", time, sep="", collapse="")]] = expected_y
+      }
+    }
+    
+    return(result)
+  })
+  
+  sensitivity.fit = list(
+    times = times.estimation,
+    deltas = deltas,
+    sensitivity = sensitivity.info
+  )
+  
+  class(sensitivity.fit) = "sensitivity.bayes.splines.fit"
+  return(sensitivity.fit)
 }
+
+summary.sensitivity.bayes.splines.fit <- function(sensitivity.fit, tail.lower=0.025, tail.upper=0.975) {
+  result = list()
+  for(group.info in sensitivity.fit$sensitivity) {
+    cat(group.info$group, "\n")
+    times.deltas = expand.grid(sensitivity.fit$deltas, sensitivity.fit$times)
+    names(times.deltas) <- c("delta","time")
+    times.deltas$mean = NA
+    times.deltas$median = NA
+    times.deltas$ci_lower = NA
+    times.deltas$ci_upper = NA
+    times.deltas$tail.lower = tail.lower
+    times.deltas$tail.upper = tail.upper
+    
+    
+    for(row in 1:nrow(times.deltas)) {
+      delta_key = paste("delta_", times.deltas[row,]$delta, sep="", collapse="")
+      time_key = paste("time_", times.deltas[row,]$time, sep="", collapse="")
+      sample = group.info[[delta_key]][[time_key]]
+      times.deltas[row,]$mean = mean(sample)
+      times.deltas[row,]$median = median(sample)
+      times.deltas[row,]$ci_lower = quantile(sample, probs=tail.lower)
+      times.deltas[row,]$ci_upper = quantile(sample, probs=tail.upper)
+    }
+    
+    result[[paste("group_", group.info$group, sep="", collapse="")]] = times.deltas
+  }
+  
+  
+}
+
 
 #' Summarize a Bayesian spline model run
 #'
