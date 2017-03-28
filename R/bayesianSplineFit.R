@@ -1674,7 +1674,7 @@ plot.slopeByDropout.bayes.splines.fit <- function (fit, groups=NULL, xlim=NULL, 
 #'
 sensitivity.bayes.splines.fit <- function(fit, times.estimation, deltas, 
                                           data.onePerSubject, times.dropout.var, group.var, 
-                                          covariates.time.var=NULL, covariates.notime.var=NULL) {
+                                          covariates.time.var=NULL, covariates.nontime.var=NULL) {
   if (is.null(fit) || !is(fit, "bayes.splines.fit")) {
     stop("Invalid model fit - must be of class bayes.splines.fit")
   }
@@ -1687,11 +1687,6 @@ sensitivity.bayes.splines.fit <- function(fit, times.estimation, deltas,
   if (is.null(deltas) || length(deltas) <= 0) {
     stop("No slope deltas specified")
   }
-  
-  # make sure data.covariates is a data frame
-  
-  ## TODO:
-  # - make data and data.covar one per subject
   
   dist = fit$dist
   model.options = fit$model.options
@@ -1816,7 +1811,7 @@ summary.sensitivity.bayes.splines.fit <- function(sensitivity.fit, tail.lower=0.
     result[[paste("group_", group.info$group, sep="", collapse="")]] = times.deltas
   }
   
-  
+  return(result)
 }
 
 
