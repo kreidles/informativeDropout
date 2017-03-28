@@ -1766,7 +1766,8 @@ sensitivity.bayes.splines.fit <- function(fit, times.estimation, deltas,
         # if dropout before time, use post drop slope, else pre drop
         expected_y = apply(preDropout.info.group$timeZero + 
                              ifelse(times.drop.matrix > time, preDropout.info.group$slope, 
-                                    (preDropout.info.group$slope * delta * (times.drop.matrix - time) + preDropout.info.group$slope * times.drop.matrix)/time), 2, mean)
+                                    (preDropout.info.group$slope * delta * (time - times.drop.matrix) + 
+                                       preDropout.info.group$slope * times.drop.matrix)/time), 2, mean)
         result[[paste("delta_", delta, sep="", collapse="")]][[paste("time_", time, sep="", collapse="")]] = expected_y
       }
     }

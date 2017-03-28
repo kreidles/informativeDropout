@@ -37,10 +37,13 @@
 #' @param groups.var column of the data set indicating the treatment groups
 #' @param covariates.var list of columns in the data set containing covariates
 #' @param times.dropout.var column of the data set containing dropout times
-#' @param times.observation.var column of the data set containing 
-#' @param method the modeling method
+#' @param times.observation.var column of the data set containing observation times
+#' @param method the modeling method, valid values are 'bayes.splines', 'dirichlet', 'mixed.splines'
 #' @param dist the distribution of the outcome, valid values are "gaussian" or "binary"
-#' @param model.options model options (see dirichlet.model.options for details)
+#' @param model.options model options 
+#' 
+#' @seealso bayes.splines.model.options
+#' @seealso dirichlet.model.options
 #' 
 #' @export informativeDropout
 #' 

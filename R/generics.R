@@ -57,17 +57,16 @@ plot.slopeByDropout <- function (fit, ...) {
 #' @param fit the model fit object
 #' @export 
 sensitivity <- function(fit, ...) {
-  # delta factor is multiplier on slope after dropout
-  # y = int + drop * slope + (time - dropout) * delta * slope
-  # arguments: min/max times, list of estimation times, 
-  # multiple deltas
-  # vector of covariate values by time
   UseMethod("sensitivity.slope", fit)
 }
 
 #'
 #' Single iteration of weighted least squares
 #' 
+#' @param y vector of outcomes
+#' @param X data frame of predictors
+#' @param eta.wls current value of the linear predictor
+#' @param model.options the model options for the current run
 #' 
 wls.binary <- function(y, X, eta.wls, model.options) { 
   
@@ -116,7 +115,8 @@ getInitialEstimatesCovariates <- function(dist, covariates, outcomes) {
 #' coefficients associated with splines
 #' 
 #' @param dist the distribution of the outcome ("gaussian" or "binary") 
-#' @param covariates date frame containing covariate values
+#' @param groupList list of groups
+#' @param X data frame containing predictor variables (assumes a column of ones for an intercept)
 #' @param outcomes vector of outcomes
 #' 
 getInitialEstimatesTheta <- function(dist, groupList, X, outcomes) {
