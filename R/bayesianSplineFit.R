@@ -1707,7 +1707,7 @@ sensitivity.bayes.splines.fit <- function(fit, times.estimation, deltas,
     }
     data.group.covar.nontime = NULL
     if (!is.null(covariates.nontime.var)) {
-      data.group[,covariates.nontime.var]
+      data.group.covar.nontime  = data.group[,covariates.nontime.var]
     }
     times.dropout.group = data.group[[times.dropout.var]]
     timeZero = matrix(rep(NA, nrow(data.group) * length(iterations)), 
