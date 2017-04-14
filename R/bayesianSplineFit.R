@@ -1668,12 +1668,26 @@ plot.slopeByDropout.bayes.splines.fit <- function (fit, groups=NULL, xlim=NULL, 
 
 
 #'
+#' sensitivity.bayes.splines.fit
+#' 
+#' Sensitivity analysis for models using the 'bayes.splines' model  Allows users to
+#' determine how sensitive the results are if the true slope after dropout changes.
 #'
-#'
-#'
+#' @param fit the fit object from a call to informativeDropout, using the 'bayes.splines' model
+#' @param times.estimation vector of times at which to estimate the expected value of the outcome
+#' @param deltas vector of multipliers to increase/decrease slope after dropout
+#' @param data.onePerSubject data frame containing one row per participant. The data frame
+#' must include dropout time and grouping variable (if multi-group design). Both time- and non-time-interacted
+#' covariates should be specified if the user wishes to include them in the sensitivity analysis.
+#' @param times.dropout.var column name containing drop out times
+#' @param group.var column name containing group values
+#' @param covariates.time.var vector of columns containing time-interacted covariates
+#' @param covariates.nontime.var vector of columns containing non-time-interacted covariates
+#' 
+#' @export sensitivity.bayes.splines.fit 
 #'
 sensitivity.bayes.splines.fit <- function(fit, times.estimation, deltas, 
-                                          data.onePerSubject, times.dropout.var, group.var, 
+                                          data.onePerSubject, times.dropout.var, group.var=NULL, 
                                           covariates.time.var=NULL, covariates.nontime.var=NULL) {
   if (is.null(fit) || !is(fit, "bayes.splines.fit")) {
     stop("Invalid model fit - must be of class bayes.splines.fit")

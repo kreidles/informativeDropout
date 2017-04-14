@@ -819,13 +819,176 @@ plot.slopeByDropout.dirichlet.fit <- function (fit, groups=NULL, xlim=NULL, ylim
   }
 }
 
-#' perform sensitivity analysis on the estimated slopes
+
+
+#'
+#' sensitivity.dirichlet.fit
 #' 
+#' Sensitivity analysis for models using the 'dirichlet' model  Allows users to
+#' determine how sensitive the results are if the true slope after dropout changes.
+#'
+#' @param fit the fit object from a call to informativeDropout, using the 'bayes.splines' model
+#' @param times.estimation vector of times at which to estimate the expected value of the outcome
+#' @param deltas vector of multipliers to increase/decrease slope after dropout
+#' @param data.onePerSubject data frame containing one row per participant. The data frame
+#' must include dropout time and grouping variable (if multi-group design). Both time- and non-time-interacted
+#' covariates should be specified if the user wishes to include them in the sensitivity analysis.
+#' @param times.dropout.var column name containing drop out times
+#' @param group.var column name containing group values
+#' @param covariates.time.var vector of columns containing time-interacted covariates
+#' @param covariates.nontime.var vector of columns containing non-time-interacted covariates
 #' 
-#' 
-sensitivity.dirichlet.fit <- function(fit, times, deltas) {
+#' @export sensitivity.dirichlet.fit 
+#'
+sensitivity.dirichlet.fit <- function(fit, times.estimation, deltas, 
+                                          data.onePerSubject, times.dropout.var, group.var=NULL, 
+                                          covariates.time.var=NULL, covariates.nontime.var=NULL) {
+  if (is.null(fit) || !is(fit, "dirichlet.fit")) {
+    stop("Invalid model fit - must be of class dirichlet.fit")
+  }
+  if (length(fit$iterations) <= 0) {
+    stop("No results found in Bayesian spline model fit")
+  }
+  if (is.null(times.estimation) || length(times.estimation) <= 0) {
+    stop("No times specified for estimation")
+  }
+  if (is.null(deltas) || length(deltas) <= 0) {
+    stop("No slope deltas specified")
+  }
   
+  ## TODO: SORT DATA FRAME THE SAME AS MAIN FIT
+  
+  dist = fit$dist
+  model.options = fit$model.options
+  iterations = fit$iterations
+  group_list = fit$groups
+  covariates.var = fit$covariates.var
+  
+  # if no group is specified, create a bogus column with a single group value, 
+  # making sure it doesn't already appear in the data set
+  if (is.null(groups.var)) {
+    group.var <- "generated_group_0"
+    idx <- 1
+    while(group.var %in% names(data)) {
+      group.var = paste("generated_group_", idx, collapse="")
+      idx <- idx + 1
+    }
+    data.onePerSubject[,group.var] = rep(1, nrow(data))
+  }
+  
+  groups = data.onePerSubject[,group.var]
+  times.dropout = data.onePerSubject[,times.dropout.var]
+  
+  # calculate pre dropout slopes for each group
+  preDropout.info = lapply(1:length(group_list), function(group_index) {
+    group = group_list[group_index]
+    data.group = data.onePerSubject[data.onePerSubject[,group.var]==group,]
+    data.group.covar.time = NULL
+    if (!is.null(covariates.time.var)) {
+      data.group.covar.time  = subset(data.group,select=covariates.time.var)
+    }
+    data.group.covar.nontime = NULL
+    if (!is.null(covariates.nontime.var)) {
+      data.group.covar.nontime  = data.group[,covariates.nontime.var]
+    }
+    times.dropout.group = data.group[[times.dropout.var]]
+    timeZero = matrix(rep(NA, nrow(data.group) * length(iterations)), 
+                      nrow = nrow(data.group))
+    preDropoutSlope = matrix(rep(NA, nrow(data.group) * length(iterations)), 
+                             nrow = nrow(data.group))
+    
+    for(i in 1:length(iterations)) {
+
+      betas.covariates.time = NULL
+      if (!is.null(covariates.time.var)) {
+        betas.covariates.time = iterations[[i]]$betas.covariates[which(covariates.var == covariates.time.var)]
+      }
+      betas.covariates.nontime = NULL
+      if (!is.null(covariates.nontime.var)) {
+        betas.covariates.nontime = iterations[[i]]$betas.covariates[which(covariates.var == covariates.nontime.var)]
+      }
+
+      preDropoutSlope[, i] = (
+         iterations[[i]]$betas[[group_index]][,"slope"] + 
+          ifelse(!is.null(betas.covariates.time), as.matrix(data.group[,covariates.time.var]) %*% betas.covariates.time, 0)
+      )
+      # intercept plus non-time interacted covariates
+      timeZero[, i] = (
+        iterations[[i]]$expected.intercept[group_index] + 
+          ifelse(!is.null(betas.covariates.nontime), as.matrix(data.group.covar.nontime) %*% betas.covariates.nontime, 0)
+      )
+    }
+    
+    return(list(group=group, slope=preDropoutSlope, timeZero=timeZero))
+  })
+  
+  sensitivity.info = lapply(1:length(group_list), function(group_index) {
+    group = group_list[group_index]
+    data.group = data.onePerSubject[data.onePerSubject[,group.var]==group,]
+    times.dropout.group = data.group[[times.dropout.var]]
+    preDropout.info.group = preDropout.info[[group_index]]
+    times.drop.matrix = matrix(times.dropout.group,nrow=nrow(preDropout.info.group$slope),ncol=length(iterations),byrow=FALSE)
+    
+    result = list(group=group_list[group_index])
+    for(delta in deltas) {
+      for(time in times.estimation) {
+        
+        cat(time, " ", delta, "\n")
+        
+        # for each iteration, calculate expected y across subjects
+        # if dropout before time, use post drop slope, else pre drop
+        expected_y = apply(preDropout.info.group$timeZero + 
+                             ifelse(times.drop.matrix > time, preDropout.info.group$slope * time, 
+                                    (preDropout.info.group$slope * delta * (time - times.drop.matrix) + 
+                                       preDropout.info.group$slope * times.drop.matrix)), 2, mean)
+        result[[paste("delta_", delta, sep="", collapse="")]][[paste("time_", time, sep="", collapse="")]] = expected_y
+      }
+    }
+    
+    return(result)
+  })
+  
+  sensitivity.fit = list(
+    times = times.estimation,
+    deltas = deltas,
+    sensitivity = sensitivity.info
+  )
+  
+  class(sensitivity.fit) = "sensitivity.dirichlet.fit"
+  return(sensitivity.fit)
 }
+
+summary.sensitivity.dirichlet.fit <- function(sensitivity.fit, tail.lower=0.025, tail.upper=0.975) {
+  result = list()
+  for(group.info in sensitivity.fit$sensitivity) {
+    cat(group.info$group, "\n")
+    times.deltas = expand.grid(sensitivity.fit$deltas, sensitivity.fit$times)
+    names(times.deltas) <- c("delta","time")
+    times.deltas$mean = NA
+    times.deltas$median = NA
+    times.deltas$ci_lower = NA
+    times.deltas$ci_upper = NA
+    times.deltas$tail.lower = tail.lower
+    times.deltas$tail.upper = tail.upper
+    
+    
+    for(row in 1:nrow(times.deltas)) {
+      delta_key = paste("delta_", times.deltas[row,]$delta, sep="", collapse="")
+      time_key = paste("time_", times.deltas[row,]$time, sep="", collapse="")
+      sample = group.info[[delta_key]][[time_key]]
+      times.deltas[row,]$mean = mean(sample)
+      times.deltas[row,]$median = median(sample)
+      times.deltas[row,]$ci_lower = quantile(sample, probs=tail.lower)
+      times.deltas[row,]$ci_upper = quantile(sample, probs=tail.upper)
+    }
+    
+    result[[paste("group_", group.info$group, sep="", collapse="")]] = times.deltas
+  }
+  
+  return(result)
+}
+
+
 
 
 #'
