@@ -33,4 +33,3 @@ Fit a varying coefficient model for longitudinal studies with
 informative dropout.  Uses a Bayesian approach with a spline fit
 to model the relationship between dropout times and slope
 }
-

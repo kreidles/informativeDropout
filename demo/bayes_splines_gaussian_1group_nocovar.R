@@ -62,9 +62,9 @@ dist = "gaussian"
 set.seed(1066) 
 
 # fit the model
-fit = informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var, 
+fit = informativeDropout(data, model.options, ids.var, outcomes.var, groups.var, covariates.var, 
                          times.dropout.var, times.observation.var, 
-                         method, dist, model.options)
+                         method=method, dist=dist)
 # summarize the result
 summary(fit)
 

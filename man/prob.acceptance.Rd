@@ -17,4 +17,3 @@ prob.acceptance(fit, action)
 calculate the acceptance probability for a given update step in the Bayesian
 spline model run.
 }
-

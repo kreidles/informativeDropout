@@ -6,7 +6,15 @@
 \usage{
 wls.binary(y, X, eta.wls, model.options)
 }
+\arguments{
+\item{y}{vector of outcomes}
+
+\item{X}{data frame of predictors}
+
+\item{eta.wls}{current value of the linear predictor}
+
+\item{model.options}{the model options for the current run}
+}
 \description{
 Single iteration of weighted least squares
 }
-

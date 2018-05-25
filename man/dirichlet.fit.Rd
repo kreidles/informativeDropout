@@ -20,4 +20,3 @@ dirichlet.fit(model.options, dist, groups, covariates.var, iterations)
 \description{
 Model fit for a Dirichlet Process model run
 }
-

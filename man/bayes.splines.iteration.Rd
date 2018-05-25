@@ -34,4 +34,3 @@ distribution of the residual error}
 
 \item{shape.tau}{}
 }
-

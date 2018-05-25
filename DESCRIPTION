@@ -9,7 +9,7 @@ Maintainer: Sarah Kreidler <skreidler@neptuneinc.org>
 Description: Varying coefficient models to account for informative dropout in
     longitudinal studies
 License: GPLv3
-RoxygenNote: 5.0.1
+RoxygenNote: 6.0.1
 Depends:
     R (>= 3.3.0)
 Imports:
@@ -22,4 +22,3 @@ Collate:
     'dirichletProcessFit.R'
     'mixedModelFit.R'
     'informativeDropout.R'
-    'examples.R'

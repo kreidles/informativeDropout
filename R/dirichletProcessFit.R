@@ -153,6 +153,8 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
 #' NULL, no density will be calculated
 #' @param density.slope.domain vector of values at which to calculate the density of the random slopes.  If NULL,
 #' no density will be calculated
+#' @param censoring.var column of data set containing an indicator for administrative censoring (optional). 
+#' 1=dropout time censored, 0=actual dropout time observed.
 #' 
 #' @importFrom matrixcalc is.positive.definite
 #' 
@@ -179,7 +181,8 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=1, print=
                                     sigma.error = NULL,
                                     sigma.error.tau = NULL,
                                     density.intercept.domain = NULL,
-                                    density.slope.domain = NULL) {
+                                    density.slope.domain = NULL,
+                                    censoring.var=NULL) {
   
   # validate the mcmc options
   if (is.na(iterations) || iterations <= 1) {
@@ -873,7 +876,7 @@ sensitivity.dirichlet.fit <- function(fit, times.estimation, deltas,
       group.var = paste("generated_group_", idx, collapse="")
       idx <- idx + 1
     }
-    data.onePerSubject[,group.var] = rep(1, nrow(data))
+    data.onePerSubject[,group.var] = rep(1, nrow(data.onePerSubject))
   }
   
   groups = data.onePerSubject[,group.var]
@@ -1011,12 +1014,13 @@ summary.sensitivity.dirichlet.fit <- function(sensitivity.fit, tail.lower=0.025,
 #' @importFrom Matrix Diagonal nearPD
 #' @importFrom mvtnorm dmvnorm rmvnorm
 #' @importFrom Hmisc rMultinom
-#'
+#' @importFrom truncnorm rtruncnorm
 #' @export
 #'
 informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, groups.var, 
                                                covariates.var, 
                                                times.dropout.var, times.observation.var, 
+                                               censoring.var,
                                                dist, model.options) {
   # make sure we have the correct type of mcmc opts
   if (!is(model.options,"dirichlet.model.options")) {
@@ -1047,7 +1051,12 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     }
   }
   
-  
+  ## if censoring variable is not specified, assume no censoring
+  if (is.null(censoring.var)) {
+    censoring.var = "generated_admin_censor"
+    data$generated_admin_censor = rep(0,nrow(data))
+  }
+
   ## reorder the data and cache information on the groups and subjects
   # number of clusters
   n.clusters <- model.options$n.clusters
@@ -1147,6 +1156,17 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     N = length(unique(data[data[,groups.var] == group, ids.var]))
     return(cbind(intercept.dev=rep(0,N), slope.dev=rep(0,N), logDropout.dev=rep(0,N)))
   })
+  # keep a copy of the log dropout times
+  logDropout = lapply(groupList, function(group) {
+    log(unique(data[data[,groups.var] == group,
+                    c(ids.var,times.dropout.var)])[,times.dropout.var] +
+          model.options$dropout.offset)
+  })
+  # get the censoring indicator per subject
+  censoring = lapply(groupList, function(group) {
+    unique(data[data[,groups.var] == group, 
+                c(ids.var,censoring.var)])[,censoring.var]
+  })
   
   # covariate coefficients 
   start.betas.covariates = NULL
@@ -1222,6 +1242,8 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       group.weights.conditional = model.current$weights.conditional[[group.index]]
       group.betas = model.current$betas[[group.index]]
       group.betas.deviations = model.current$betas.deviations[[group.index]]
+      group.logDropout = logDropout[[group.index]]
+      group.censoring = censoring[[group.index]]
       group.cluster.mu = model.current$cluster.mu[[group.index]]
       group.dp.cluster.sigma = model.current$dp.cluster.sigma[[group.index]]
       group.dp.dist.mu0 = model.current$dp.dist.mu0[[group.index]]
@@ -1317,6 +1339,8 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         betas.currentCluster.rows = ifelse(group.cluster.N[h] > 0, nrow(betas.currentCluster), 0)
         subjectMeans.currentCluster = matrix(rep(means.currentCluster, betas.currentCluster.rows),
                                              ncol=3,byrow=TRUE)
+        censoring.currentCluster = group.censoring[group.cluster.assignments==h]
+        
         ## conditional prior mean/var
         prior.mean = as.numeric((means.currentCluster[1] + covar %*% inv.slopeU %*% 
                                    t(betas.currentCluster[,c(2,3),drop=FALSE] - subjectMeans.currentCluster[,c(2,3),drop=FALSE])))
@@ -1457,6 +1481,31 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
           update <- 1 * (log(runif(group.cluster.N[h])) < ratio)
           group.betas[group.cluster.assignments == h, 2][update == 1] <- beta.star[update == 1]
         }
+        
+        ## draw dropout times for censored observations from truncated normal
+        # domain (a = observed censoring to b=Inf)
+        if (sum(group.censoring[group.cluster.assignments == h]) > 0) { 
+          tmp.corr = (
+            matrix(c(group.dp.cluster.sigma[1,3], group.dp.cluster.sigma[2,3]),1) %*% 
+              solve(group.dp.cluster.sigma[-3,-3])
+          )
+          tnorm.mean = as.numeric((means.currentCluster[3] + tmp.corr %*% 
+                                     t(group.betas[group.cluster.assignments==h & 
+                                                     group.censoring==1, c(1,2), drop=FALSE] - 
+                                         subjectMeans.currentCluster[censoring.currentCluster==1, c(1,2),drop=FALSE])))
+          tnorm.var = as.numeric(group.dp.cluster.sigma[3,3] - 
+                                   tmp.corr %*% 
+                                   t(matrix(c(group.dp.cluster.sigma[1,3], 
+                                              group.dp.cluster.sigma[2,3]),1)))
+          
+          group.betas[group.cluster.assignments == h & group.censoring == 1,3] <-
+            rtruncnorm(sum(group.censoring[group.cluster.assignments == h]),
+                       a=group.logDropout[group.cluster.assignments == h & group.censoring == 1], 
+                       b=Inf, 
+                       mean=tnorm.mean,
+                       sd=sqrt(tnorm.var)) 
+        }
+        
         # calculating the subject specific deviations from the cluster means
         # used to simplify calculation of the covariance
         #calculate betas minus their means

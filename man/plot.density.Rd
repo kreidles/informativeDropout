@@ -12,4 +12,3 @@ plot.density(fit, ...)
 \description{
 density plot for a parameter
 }
-

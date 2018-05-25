@@ -12,4 +12,3 @@ plot.trace(fit, ...)
 \description{
 trace plot for a parameter
 }
-

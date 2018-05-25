@@ -4,9 +4,9 @@
 \alias{addKnot.binary}
 \title{addKnot.binary}
 \usage{
-addKnot.binary(model.options, knots.previous, outcomes, times.dropout,
-  times.observation, covariates, X.previous, Theta.previous, Z, alpha,
-  betaCovariates)
+addKnot.binary(model.options, knots.previous, knots.positions.candidate,
+  outcomes, times.dropout, times.observation, covariates, X.previous,
+  Theta.previous, Z, alpha, betaCovariates)
 }
 \arguments{
 \item{model.options}{model options}
@@ -38,4 +38,3 @@ list containing updated X, knots, Theta, and boolean indicating if change accept
 For binary outcomes, add a new knot and use a Metropolis-Hastings step
 to determine if we keep the changes to the model.
 }
-

@@ -19,4 +19,3 @@ calculateMarginalSlope(knotsByGroup, ThetaByGroup, subjectsPerGroup,
 \description{
 Calculate the marginal slope at the given iteration
 }
-

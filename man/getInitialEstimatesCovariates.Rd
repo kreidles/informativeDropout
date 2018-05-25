@@ -18,4 +18,3 @@ getInitialEstimatesCovariates(dist, covariates, outcomes)
 Fit a simple linear model to get initial values for regression
 coefficients associated with covariates
 }
-

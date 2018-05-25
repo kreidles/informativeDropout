@@ -18,4 +18,3 @@ be produced for each group}
 \description{
 Produce a trace plot of the specified variable in Dirichlet model fit
 }
-

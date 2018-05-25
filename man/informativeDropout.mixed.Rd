@@ -30,4 +30,3 @@ informativeDropout.mixed(data, ids.var, outcomes.var, groups.var,
 Fit a mixed model which accounts for dropout by modeling the 
 releationship between dropout time and slope with natural cubic B-splines
 }
-

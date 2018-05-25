@@ -17,4 +17,3 @@ hiv
 Longitudinal data of HIV in men who are both users and non-users of IV drugs
 }
 \keyword{datasets}
-

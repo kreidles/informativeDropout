@@ -12,4 +12,3 @@
 \description{
 Summarize a Bayesian spline model run
 }
-

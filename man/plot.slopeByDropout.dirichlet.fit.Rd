@@ -30,4 +30,3 @@
 \description{
 Plot the slope by dropout time for a Dirichlet Model fit
 }
-

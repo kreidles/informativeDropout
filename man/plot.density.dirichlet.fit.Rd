@@ -24,4 +24,3 @@
 \description{
 Plot the densities of the random effects for a Dirichlet Process model
 }
-

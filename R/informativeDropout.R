@@ -38,6 +38,7 @@
 #' @param covariates.var list of columns in the data set containing covariates
 #' @param times.dropout.var column of the data set containing dropout times
 #' @param times.observation.var column of the data set containing observation times
+#' @param censoring.var column with indicators for administrative censoring (Dirichlet models only)
 #' @param method the modeling method, valid values are 'bayes.splines', 'dirichlet', 'mixed.splines'
 #' @param dist the distribution of the outcome, valid values are "gaussian" or "binary"
 #' @param model.options model options 
@@ -47,10 +48,11 @@
 #' 
 #' @export informativeDropout
 #' 
-informativeDropout <- function(data, ids.var, outcomes.var, groups.var, covariates.var, 
+informativeDropout <- function(data, model.options,
+                               ids.var, outcomes.var, groups.var, covariates.var, 
                                times.dropout.var, times.observation.var,
-                               method="bayes.splines", dist="normal",
-                               model.options) {
+                               censoring.var=NULL,
+                               method="bayes.splines", dist="normal") {
   
   if (method == 'bayes.splines') {
     # model the relationship between dropout time and slope using natural splines
@@ -60,7 +62,8 @@ informativeDropout <- function(data, ids.var, outcomes.var, groups.var, covariat
   } else if (method == 'dirichlet') {
     # account for informative dropout using a dirichlet process 
     return (informativeDropout.bayes.dirichlet(data, ids.var, outcomes.var, groups.var, covariates.var, 
-                                               times.dropout.var, times.observation.var, dist, model.options))
+                                               times.dropout.var, times.observation.var, censoring.var,
+                                               dist, model.options))
   } else if (method == 'mixed.splines') {
     # fit a mixed model which models the relationship between dropout time and slope using natural splines
     return (informativeDropout.mixed(data, ids.var, outcomes.var, groups.var, covariates.var, 

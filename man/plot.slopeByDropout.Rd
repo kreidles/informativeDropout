@@ -12,4 +12,3 @@ plot.slopeByDropout(fit, ...)
 \description{
 plot the slope by dropout time
 }
-

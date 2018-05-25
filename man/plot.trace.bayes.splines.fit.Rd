@@ -13,4 +13,3 @@
 \description{
 Create a trace plot of the specified parameter
 }
-

@@ -12,4 +12,3 @@ updateFixedEffectsCovariates.binary(model.options, outcomes, covariates, X,
 Update the regression coefficients related to common
 covariates and group effects
 }
-

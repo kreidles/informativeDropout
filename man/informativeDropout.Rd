@@ -4,12 +4,14 @@
 \alias{informativeDropout}
 \title{informativeDropout}
 \usage{
-informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var,
-  times.dropout.var, times.observation.var, method = "bayes.splines",
-  dist = "normal", model.options)
+informativeDropout(data, model.options, ids.var, outcomes.var, groups.var,
+  covariates.var, times.dropout.var, times.observation.var,
+  censoring.var = NULL, method = "bayes.splines", dist = "normal")
 }
 \arguments{
 \item{data}{the data set}
+
+\item{model.options}{model options}
 
 \item{ids.var}{column of the data set containing participant identifiers}
 
@@ -21,12 +23,16 @@ informativeDropout(data, ids.var, outcomes.var, groups.var, covariates.var,
 
 \item{times.dropout.var}{column of the data set containing dropout times}
 
-\item{times.observation.var}{column of the data set containing}
+\item{times.observation.var}{column of the data set containing observation times}
 
-\item{method}{the modeling method}
+\item{censoring.var}{column with indicators for administrative censoring (Dirichlet models only)}
+
+\item{method}{the modeling method, valid values are 'bayes.splines', 'dirichlet', 'mixed.splines'}
 
 \item{dist}{the distribution of the outcome, valid values are "gaussian" or "binary"}
-
-\item{model.options}{model options (see dirichlet.model.options for details)}
 }
+\seealso{
+bayes.splines.model.options
 
+dirichlet.model.options
+}

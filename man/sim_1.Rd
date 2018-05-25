@@ -19,4 +19,3 @@ A simulated data set based on the Multicenter Aids study
 Longitudinal data of HIV in men who are both users and non-users of IV drugs
 }
 \keyword{datasets}
-

@@ -14,4 +14,3 @@ mixed.model.options(knots.positions = NULL)
 Model options for the mixed model fit.  A convenience wrapper
 around lme
 }
-

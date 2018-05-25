@@ -5,7 +5,8 @@
 \title{infortmativeDropout.bayes.dirichlet}
 \usage{
 informativeDropout.bayes.dirichlet(data, ids.var, outcomes.var, groups.var,
-  covariates.var, times.dropout.var, times.observation.var, dist, model.options)
+  covariates.var, times.dropout.var, times.observation.var, censoring.var, dist,
+  model.options)
 }
 \arguments{
 \item{data}{the data set}
@@ -30,4 +31,3 @@ informativeDropout.bayes.dirichlet(data, ids.var, outcomes.var, groups.var,
 Fit a bayesian model which accounts for dropout by modeling the 
 releationship between dropout time and slope with natural cubic B-splines
 }
-

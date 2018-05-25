@@ -33,4 +33,3 @@ iterations to throw away at the beginning of the simulation}
 \description{
 Simulation and model options for the natural b-spline model
 }
-

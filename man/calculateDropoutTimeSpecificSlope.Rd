@@ -23,4 +23,3 @@ calculateDropoutTimeSpecificSlope(dropoutEstimationTimes, knotsByGroup,
 \description{
 Calculate the estimated slope at the given dropout times
 }
-

@@ -15,7 +15,8 @@ dirichlet.model.options(iterations = 10000, burnin = 500, thin = 1,
   dp.dist.sigma0.Tb = NULL, betas.covariates = NULL,
   betas.covariates.mu = NULL, betas.covariates.sigma = NULL,
   sigma.error = NULL, sigma.error.tau = NULL,
-  density.intercept.domain = NULL, density.slope.domain = NULL)
+  density.intercept.domain = NULL, density.slope.domain = NULL,
+  censoring.var = NULL)
 }
 \arguments{
 \item{iterations}{number of iterations for the MCMC simulation}
@@ -75,10 +76,12 @@ NULL, no density will be calculated}
 \item{density.slope.domain}{vector of values at which to calculate the density of the random slopes.  If NULL,
 no density will be calculated}
 
+\item{censoring.var}{column of data set containing an indicator for administrative censoring (optional). 
+1=dropout time censored, 0=actual dropout time observed.}
+
 \item{numClusters}{number of clusters for the Dirichlet Process stick breaking model}
 }
 \description{
 Model options for the Dirichlet Process model.  Includes starting values, priors and
 simulation/MCMC parameters.
 }
-

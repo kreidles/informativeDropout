@@ -40,4 +40,3 @@ list containing updated X, knots, Theta, and boolean indicating if change accept
 Add a new knot and use a Metropolis-Hastings step
 to determine if we keep the changes to the model
 }
-

@@ -12,4 +12,3 @@
 \description{
 Summarize a Dirichlet model run
 }
-

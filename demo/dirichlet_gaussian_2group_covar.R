@@ -70,11 +70,11 @@ dist='gaussian'
 set.seed(1066)
 
 # fit the Dirichlet process model
-fit = informativeDropout(data, ids.var, 
+fit = informativeDropout(data, model.options, ids.var, 
                          outcomes.var, groups.var,
                          covariates.var, 
                          times.dropout.var, times.observation.var,
-                         method, dist, model.options)
+                         method=method, dist=dist)
 
 # print a summary
 summary(fit)
