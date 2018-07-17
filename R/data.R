@@ -31,7 +31,7 @@
 #'   \item{carat}{weight of the diamond, in carats}
 #'   ...
 #' }
-"hiv"
+"untreated_hiv"
 
 #' A simulated data set based on the Multicenter Aids study
 #' Longitudinal data of HIV in men who are both users and non-users of IV drugs
@@ -42,7 +42,7 @@
 #'   \item{carat}{weight of the diamond, in carats}
 #'   ...
 #' }
-"macs"
+"treated_hiv"
 
 #' A simulated data set based on the Multicenter Aids study
 #' Longitudinal data of HIV in men who are both users and non-users of IV drugs

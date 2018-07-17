@@ -23,8 +23,8 @@
 #####################################################################
 
 # load the data set
-data(hiv)
-data <- hiv
+data("untreated_hiv")
+data <- untreated_hiv
 #data <- data[data$hard==0,]
 # set the model options
 model.options <- bayes.splines.model.options(
@@ -44,14 +44,13 @@ model.options <- bayes.splines.model.options(
   sigma.randomEffects.scale = diag(2))
 
 # select columns to include in the model
-ids.var = "WIHSID"
+ids.var = "patid"
 outcomes.var = "logcd4"
-groups.var = "hard"
+groups.var = "hard_drug"
 #groups.var=NULL
-data$timebaselogcd4 = data$baselogcd4 * data$years
-covariates.var = c("baselogcd4", "timebaselogcd4")
+covariates.var = c("baselogcd4", "baselogcd4_years")
 #covariates.var = NULL
-times.dropout.var = "drop"
+times.dropout.var = "drop_day"
 times.observation.var = "years"
 
 # set the model fitting method

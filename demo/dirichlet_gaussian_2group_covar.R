@@ -27,7 +27,7 @@
 #####################################
 
 # load the simulated Multicenter AIDS Cohort Study data
-data(macs)
+data("untreated_hiv")
 
 # create the model options
 model.options=dirichlet.model.options(iterations=100, n.clusters=60, burnin=0, thin=1,
@@ -56,13 +56,13 @@ model.options=dirichlet.model.options(iterations=100, n.clusters=60, burnin=0, t
 
 
 # define the columns in the data set to be used in the model
-data=macs
-ids.var="CASEID"
+data=untreated_hiv
+ids.var="patid"
 outcomes.var="logcd4"
-groups.var="hard"
-covariates.var=c("logbase", "basebytime") 
-times.dropout.var="dropouttime"
-times.observation.var='time'
+groups.var="hard_drug"
+covariates.var=c("baselogcd4", "baselogcd4_years") 
+times.dropout.var="drop_day"
+times.observation.var='years'
 method="dirichlet"
 dist='gaussian'
 
