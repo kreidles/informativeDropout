@@ -16,6 +16,7 @@ Imports:
     matrixcalc,MCMCpack,gtools,Matrix,splines,MASS,abind,mvtnorm,Hmisc
 VignetteBuilder: knitr
 Collate:
+    'ba_dp_paper.R'
     'generics.R'
     'bayesianSplineFit.R'
     'data.R'
