@@ -29,7 +29,7 @@ mean_log_dropout = mean(log(unique.data.frame(data[,c("patid", 'drop_year')])$dr
 # set the data frame columns for outcomes, covariates, etc.
 ids.var="patid"
 outcomes.var="logcd4"
-groups.var="hard" 
+groups.var="hard_drug" 
 covariates.var=c("baselogcd4", "baselogcd4xt") 
 times.dropout.var="drop_year" 
 times.observation.var="years"
