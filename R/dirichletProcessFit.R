@@ -1421,7 +1421,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
         prior.var = as.numeric((group.dp.cluster.sigma[2,2] - covar %*% inv.intU %*% t(covar)))
         
         if (dist == "gaussian") {
-          ## calculate the posterior mean and variance for the random intercept
+          ## calculate the posterior mean and variance for the random slope
           posterior.var = 1 / ((1 / prior.var) + 
                                  (tapply(data.currentCluster[, times.observation.var]^2, 
                                          data.currentCluster[, ids.var], sum) / 
@@ -1525,7 +1525,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       # Common covariance for each cluster (Step 4)
       # Update Cluster Covariance
       model.current$dp.cluster.sigma[[group.index]] = riwish(
-        model.options$dp.cluster.sigma.nu0 + group.n, # <- check typo
+        model.options$dp.cluster.sigma.nu0 + group.n, 
         model.options$dp.cluster.sigma.T0 + crossprod(group.betas.deviations)
       )
       ### Update the hyprparameters of the baseline distribution of 

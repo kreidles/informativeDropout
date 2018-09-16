@@ -58,8 +58,8 @@ model.options=dirichlet.model.options(iterations=20, n.clusters=60, burnin=0, th
                                       betas.covariates.sigma = 100*diag(2),
                                       sigma.error = 1,
                                       sigma.error.tau = 0.001, 
-                                      density.slope.domain = seq(-4,4,0.1),
-                                      density.intercept.domain = seq(-4,4,0.1))
+                                      density.slope.domain = seq(-4,3,0.1),
+                                      density.intercept.domain = seq(-4,3,0.1))
 
 fit = informativeDropout(data, model.options, ids.var, 
                          outcomes.var, groups.var,
