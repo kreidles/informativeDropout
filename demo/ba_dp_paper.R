@@ -37,7 +37,7 @@ censoring.var = "delta"
 dist = "gaussian"
 method="dirichlet"
 
-model.options=dirichlet.model.options(iterations=200000, n.clusters=60, burnin=0, thin=1,
+model.options=dirichlet.model.options(iterations=20000, n.clusters=60, burnin=5000, thin=1,
                                       print=100,
                                       dropout.offset=0,
                                       dropout.estimationTimes = seq(2,13,1),
@@ -67,3 +67,6 @@ fit = informativeDropout(data, model.options, ids.var,
                          times.dropout.var, times.observation.var,
                          censoring.var=censoring.var,
                          method=method, dist=dist)
+
+# summarize the result
+summary(fit)
