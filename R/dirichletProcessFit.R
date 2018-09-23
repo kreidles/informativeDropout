@@ -651,7 +651,7 @@ plot.trace.dirichlet.fit <- function (fit, type="expectation", groups=NULL, para
 #' @param ylim the limits of the Y-axis
 #' @param colors vector of colors for each group
 #'
-#' @export plot.slopeByDropout.bayes.splines.fit
+#' @export plot.slopeByDropout.dirichlet.fit
 #' 
 plot.density.dirichlet.fit <- function (fit, params=NULL, groups=NULL, overlay=TRUE,
                                         xlim=NULL, ylim=NULL, colors=NULL, lty=1) {

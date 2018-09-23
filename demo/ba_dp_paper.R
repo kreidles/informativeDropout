@@ -37,7 +37,7 @@ censoring.var = "delta"
 dist = "gaussian"
 method="dirichlet"
 
-model.options=dirichlet.model.options(iterations=20000, n.clusters=60, burnin=5000, thin=1,
+model.options=dirichlet.model.options(iterations=200000, n.clusters=60, burnin=5000, thin=1,
                                       print=100,
                                       dropout.offset=0,
                                       dropout.estimationTimes = seq(2,13,1),
@@ -70,3 +70,21 @@ fit = informativeDropout(data, model.options, ids.var,
 
 # summarize the result
 summary(fit)
+
+# calculate difference in slope between hard drug users and non-users
+expected_slope_diff = unlist(lapply(fit$iterations, function(x) { 
+  # hard drug users minus non-users
+  expected.slope_diff = x$expected.slope[[2]] - x$expected.slope[[1]]
+  return (ifelse(is.null(expected.slope_diff), 0, expected.slope_diff))
+}))
+print("Group difference in slope (hard drug users minus non-users)")
+data.frame(
+  mean=c(mean(expected_slope_diff)),
+  median=c(median(expected_slope_diff)),
+  ci_lower=c(quantile(expected_slope_diff, probs=0.025)),
+  ci_upper=c(quantile(expected_slope_diff, probs=0.975))
+)
+
+
+
+
