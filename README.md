@@ -12,12 +12,10 @@ for Non-Ignorable Dropout, In review.
 Moore, C.M., Carlson, N.E., MaWhinney, S. A Dirichlet Process Mixture Model for
 Non-Ignorable Dropout, In review.
 
-### Instructions for replicating the manuscript results 
+### Installation instructions
 
 The results in the above manuscript were produced using R version 3.2.4. To reproduce the results,
 perform the following steps:
-
-* Add dependencies!!
 
 * Install R version 3.2.x or higher by following the instructions at http://www.r-project.org
 * From the R environment, install and load the "devtools" package
@@ -34,10 +32,21 @@ install_github(repo="kreidles/informativeDropout", ref="develop")
 library(informativeDropout)
 ```
 
-### Instructions for replicating results in "A Bayesian Natural Cubic B Spline Varying Coefficient Method for Non-Ignorable Dropout"
-
-TBD
-
 ### Instructions for replicating results in "A Dirichlet Process Mixture Model for Non-Ignorable Dropout"
 
-TBD
+Install the informativeDropout package as described above.
+
+Run the DP model demo program
+
+```R
+demo(ba_dp_paper)
+```
+The demo will run for 200,000 iterations may take up to 24 hours to run, depending on processor speed. 
+
+### Instructions for replicating results in "A Bayesian Natural Cubic B Spline Varying Coefficient Method for Non-Ignorable Dropout"
+
+(coming soon)
+
+
+
+

@@ -77,14 +77,14 @@ expected_slope_diff = unlist(lapply(fit$iterations, function(x) {
   expected.slope_diff = x$expected.slope[[2]] - x$expected.slope[[1]]
   return (ifelse(is.null(expected.slope_diff), 0, expected.slope_diff))
 }))
-print("Group difference in slope (hard drug users minus non-users)")
-data.frame(
+diff_df = data.frame(
   mean=c(mean(expected_slope_diff)),
   median=c(median(expected_slope_diff)),
   ci_lower=c(quantile(expected_slope_diff, probs=0.025)),
   ci_upper=c(quantile(expected_slope_diff, probs=0.975))
 )
-
+print("Group difference in slope (hard drug users minus non-users)")
+print(diff_df)
 
 
 
