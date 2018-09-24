@@ -5,7 +5,7 @@ Title: informativeDropout: varying coefficient models to account for informative
 Version: 1.0.0
 Date: 2015-08-02
 Author: Sarah Kreidler
-Maintainer: Sarah Kreidler <skreidler@neptuneinc.org>
+Maintainer: Sarah Kreidler <sarah.kreidler@sunrun.com>
 Description: Varying coefficient models to account for informative dropout in
     longitudinal studies
 License: GPLv3
