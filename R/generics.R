@@ -67,6 +67,7 @@ sensitivity <- function(fit, ...) {
 #' @param X data frame of predictors
 #' @param eta.wls current value of the linear predictor
 #' @param model.options the model options for the current run
+#' @param eta.null the value of the linear predictor for a null model - logit(p event)
 #' 
 wls.binary <- function(y, X, eta.wls, model.options, eta.null) { 
   
@@ -88,24 +89,25 @@ wls.binary <- function(y, X, eta.wls, model.options, eta.null) {
 #' coefficients associated with covariates
 #' 
 #' @param dist the distribution of the outcome ("gaussian" or "binary") 
-#' @param covariates date frame containing covariate values
+#' @param covariates data frame containing covariate values
+#' @param times vector of observation times
 #' @param outcomes vector of outcomes
 #' 
 #'
-getInitialEstimatesCovariates <- function(dist, covariates, outcomes) {
+getInitialEstimatesCovariates <- function(dist, covariates, times, outcomes) {
   if (is.null(covariates) || ncol(covariates) == 0) {
     return (NULL)
   }
   
-  data.covar = cbind(outcomes, covariates)
+  data.covar = cbind(outcomes, times,covariates)
   formula = as.formula(paste(c(paste(names(outcomes), "~"), 
-                               paste(names(covariates), collapse=" + ")), collapse=" "))
+                               paste(names(data.covar[,-1]), collapse=" + ")), collapse=" "))
   if (dist == 'gaussian') {
     fit.beta <- lm(formula, data=data.covar)
-    return (as.vector(coef(fit.beta))[-1])
+    return (as.vector(coef(fit.beta))[-c(1,2)])
   } else if (dist == 'binary') {
     fit.beta <- glm(formula, family=binomial, data=data.covar)
-    return (as.vector(coef(fit.beta))[-1])
+    return (as.vector(coef(fit.beta))[-c(1,2)])
   } else {
     stop("unsupported distribution")
   }
@@ -116,25 +118,39 @@ getInitialEstimatesCovariates <- function(dist, covariates, outcomes) {
 #' 
 #' @param dist the distribution of the outcome ("gaussian" or "binary") 
 #' @param groupList list of groups
+#' @param groups vector of group assignments
 #' @param X data frame containing predictor variables (assumes a column of ones for an intercept)
+#' @param covariates data frame containing covariate values
 #' @param outcomes vector of outcomes
 #' 
-getInitialEstimatesTheta <- function(dist, groupList, X, outcomes) {
-  data.theta = cbind(outcomes, X)
+getInitialEstimatesTheta <- function(dist, groupList, groups, X, covariates, outcomes) {
+  data.theta = cbind(outcomes, X, covariates)
   formula = as.formula(paste(c(paste(names(outcomes), "~"), 
                                paste(names(X)[2:length(names(X))], 
                                      collapse=" + ")), 
                              collapse=" "))
   if (dist == 'gaussian') {
-    fit.Theta <- lm(formula, data=data.theta)
     return (lapply(1:length(groupList), function(i) {
-      return (as.vector(coef(fit.Theta)))
+      group = groupList[i]
+      formula = as.formula(paste(c(paste(names(outcomes), "~"), 
+                                   paste(c(names(X)[2:length(names(X))],names(covariates)), 
+                                         collapse=" + ")), 
+                                 collapse=" "))
+      fit.Theta <- lm(formula, data=data.theta[groups==group,])
+      
+      return (as.vector(coef(fit.Theta)[1:length(names(X))]))
     }))
   } else {
     # binomial
-    fit.Theta <- glm(formula, family=binomial, data=data.theta)
     return (lapply(1:length(groupList), function(i) {
-      return (as.vector(coef(fit.Theta)))
+      group = groupList[i]
+      formula = as.formula(paste(c(paste(names(outcomes), "~"), 
+                                   paste(c(names(X)[2:length(names(X))],names(covariates)), 
+                                         collapse=" + ")), 
+                                 collapse=" "))
+      fit.Theta <- glm(formula, family='binomial',data=data.theta[groups==group,])
+      
+      return (as.vector(coef(fit.Theta)[1:length(names(X))])) 
     }))
   }
 }
