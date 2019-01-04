@@ -41,8 +41,7 @@ model.options <- bayes.splines.model.options(iterations=100, burnin=10, thin=1,
                                              sigma.randomSlope = 1,
                                              sigma.randomInterceptSlope = 0.001,
                                              sigma.randomEffects.df = 3,
-                                             sigma.randomEffects.scale = diag(2),
-                                             eta.null=0.01)
+                                             sigma.randomEffects.scale = diag(2))
 
 # set the columns to use in the model
 ids.var = "patid"
