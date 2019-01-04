@@ -6,8 +6,8 @@
 to determine if we keep the changes to the model}
 \usage{
 updateCovarianceParameters.gaussian(model.options, totalObservations,
-  numSubjects, firstObsPerSubject, outcomes, covariates, X, Theta, Z, alpha,
-  betaCovariates, sigma.error)
+  numSubjects, firstObsPerSubject, outcomes, covariates, X, Theta, Z,
+  alpha, betaCovariates, sigma.error)
 }
 \arguments{
 \item{x}{A number.}

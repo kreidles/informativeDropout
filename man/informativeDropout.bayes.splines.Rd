@@ -7,7 +7,8 @@ informative dropout.  Uses a Bayesian approach with a spline fit
 to model the relationship between dropout times and slope}
 \usage{
 informativeDropout.bayes.splines(data, ids.var, outcomes.var, groups.var,
-  covariates.var, times.dropout.var, times.observation.var, dist, model.options)
+  covariates.var, times.dropout.var, times.observation.var, dist,
+  model.options)
 }
 \arguments{
 \item{data}{the data set}

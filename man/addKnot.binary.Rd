@@ -6,7 +6,7 @@
 \usage{
 addKnot.binary(model.options, knots.previous, knots.positions.candidate,
   outcomes, times.dropout, times.observation, covariates, X.previous,
-  Theta.previous, Z, alpha, betaCovariates)
+  Theta.previous, Z, alpha, betaCovariates, eta.null)
 }
 \arguments{
 \item{model.options}{model options}

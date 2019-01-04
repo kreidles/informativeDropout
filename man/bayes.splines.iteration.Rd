@@ -5,8 +5,9 @@
 \title{bayes.splines.iteration}
 \usage{
 bayes.splines.iteration(knots = NULL, Theta = NULL,
-  betas.covariates = NULL, sigma.residual = 1, sigma.randomIntercept = 1,
-  sigma.randomSlope = 1, sigma.randomInterceptSlope = 0, sigma.error = 1,
+  betas.covariates = NULL, sigma.residual = 1,
+  sigma.randomIntercept = 1, sigma.randomSlope = 1,
+  sigma.randomInterceptSlope = 0, sigma.error = 1,
   sigma.error.shape = 0.001, sigma.error.rate = 0.001)
 }
 \arguments{
@@ -33,4 +34,7 @@ distribution of the residual error}
 distribution of the residual error}
 
 \item{shape.tau}{}
+}
+\description{
+bayes.splines.iteration
 }

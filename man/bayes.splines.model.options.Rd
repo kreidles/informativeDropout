@@ -4,12 +4,13 @@
 \alias{bayes.splines.model.options}
 \title{bayes.splines.model.options}
 \usage{
-bayes.splines.model.options(iterations = 10000, burnin = 500, thin = 1,
-  print = 1, knots.prob.birth = 0.5, knots.min = 1, knots.max = NA,
-  knots.stepSize = 3, knots.positions.start = NULL,
-  knots.positions.candidate = NULL, prob.min = 1e-05, prob.max = 0.99999,
-  accept.rate.adjust = 1, dropout.estimationTimes = NULL,
-  sigma.beta = NULL, sigma.residual = NULL, sigma.error = NULL,
+bayes.splines.model.options(iterations = 10000, burnin = 500,
+  thin = 1, print = 1, knots.prob.birth = 0.5, knots.min = 1,
+  knots.max = NA, knots.stepSize = 3, knots.positions.start = NULL,
+  knots.positions.candidate = NULL, prob.min = 1e-05,
+  prob.max = 0.99999, accept.rate.adjust = 1,
+  dropout.estimationTimes = NULL, sigma.beta = NULL,
+  sigma.residual = NULL, sigma.error = NULL,
   sigma.error.shape.tau = NULL, sigma.error.rate.tau = NULL,
   lambda.numKnots = NULL, sigma.randomIntercept = NULL,
   sigma.randomSlope = NULL, sigma.randomInterceptSlope = NULL,

@@ -9,7 +9,7 @@ Maintainer: Sarah Kreidler <sarah.kreidler@sunrun.com>
 Description: Varying coefficient models to account for informative dropout in
     longitudinal studies
 License: GPLv3
-RoxygenNote: 6.0.1
+RoxygenNote: 6.1.1
 Depends:
     R (>= 3.3.0)
 Imports:

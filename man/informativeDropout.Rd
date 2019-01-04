@@ -31,6 +31,9 @@ informativeDropout(data, model.options, ids.var, outcomes.var, groups.var,
 
 \item{dist}{the distribution of the outcome, valid values are "gaussian" or "binary"}
 }
+\description{
+informativeDropout
+}
 \seealso{
 bayes.splines.model.options
 

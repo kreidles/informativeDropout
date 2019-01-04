@@ -8,11 +8,11 @@ dirichlet.iteration(weights.mixing = NULL, weights.conditional = NULL,
   cluster.assignments = NULL, betas = NULL, betas.deviations = NULL,
   betas.covariates = NULL, betas.covariates.mu = NULL,
   betas.covariates.sigma = NULL, dp.dist.mu0 = NULL,
-  dp.dist.sigma0 = NULL, dp.cluster.sigma = NULL, dp.concentration = NULL,
-  cluster.N = NULL, cluster.mu = NULL, sigma.error = NULL,
-  expected.intercept = NULL, expected.slope = NULL,
-  slope.dropoutTimes = NULL, density.intercept = NULL,
-  density.slope = NULL)
+  dp.dist.sigma0 = NULL, dp.cluster.sigma = NULL,
+  dp.concentration = NULL, cluster.N = NULL, cluster.mu = NULL,
+  sigma.error = NULL, expected.intercept = NULL,
+  expected.slope = NULL, slope.dropoutTimes = NULL,
+  density.intercept = NULL, density.slope = NULL)
 }
 \arguments{
 \item{weights.mixing}{vector containing the probability of belonging to cluster k, 
@@ -68,4 +68,7 @@ in cluster k, for k = 1 to the number of clusters}
 \item{expected.intercept}{expected value of the random intercepts}
 
 \item{expected.slope}{expected value of the random slopes}
+}
+\description{
+dirichlet.iteration
 }

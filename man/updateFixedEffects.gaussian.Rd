@@ -6,8 +6,8 @@
 to determine if we keep the changes to the model}
 \usage{
 updateFixedEffects.gaussian(model.options, knots.previous, outcomes,
-  times.dropout, times.observation, covariates, X.previous, Theta.previous, Z,
-  alpha, betaCovariates, sigma.error)
+  times.dropout, times.observation, covariates, X.previous, Theta.previous,
+  Z, alpha, betaCovariates, sigma.error)
 }
 \arguments{
 \item{x}{A number.}

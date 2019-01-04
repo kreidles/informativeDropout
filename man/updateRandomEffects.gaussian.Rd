@@ -4,10 +4,10 @@
 \alias{updateRandomEffects.gaussian}
 \title{Update the random effects}
 \usage{
-updateRandomEffects.gaussian(numSubjects, numObservations, firstObsPerSubject,
-  subjectsPerGroup, ids, outcomes, times.observation, covariates, X, Theta, Z,
-  alpha, betaCovariates, sigma.randomIntercept, sigma.randomSlope,
-  sigma.randomInterceptSlope, sigma.error)
+updateRandomEffects.gaussian(numSubjects, numObservations,
+  firstObsPerSubject, subjectsPerGroup, ids, outcomes, times.observation,
+  covariates, X, Theta, Z, alpha, betaCovariates, sigma.randomIntercept,
+  sigma.randomSlope, sigma.randomInterceptSlope, sigma.error)
 }
 \description{
 Update the random effects

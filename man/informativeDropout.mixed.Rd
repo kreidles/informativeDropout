@@ -5,7 +5,8 @@
 \title{infortmativeDropout.mixed}
 \usage{
 informativeDropout.mixed(data, ids.var, outcomes.var, groups.var,
-  covariates.var, times.dropout.var, times.observation.var, dist, model.options)
+  covariates.var, times.dropout.var, times.observation.var, dist,
+  model.options)
 }
 \arguments{
 \item{data}{the data set}

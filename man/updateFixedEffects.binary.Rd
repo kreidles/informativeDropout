@@ -6,8 +6,8 @@
 to determine if we keep the changes to the model}
 \usage{
 updateFixedEffects.binary(model.options, knots.previous, outcomes,
-  times.dropout, times.observation, covariates, X.previous, Theta.previous, Z,
-  alpha, betaCovariates)
+  times.dropout, times.observation, covariates, X.previous, Theta.previous,
+  Z, alpha, betaCovariates)
 }
 \arguments{
 \item{x}{A number.}

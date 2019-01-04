@@ -4,7 +4,7 @@
 \alias{wls.binary}
 \title{Single iteration of weighted least squares}
 \usage{
-wls.binary(y, X, eta.wls, model.options)
+wls.binary(y, X, eta.wls, model.options, eta.null)
 }
 \arguments{
 \item{y}{vector of outcomes}
@@ -14,6 +14,8 @@ wls.binary(y, X, eta.wls, model.options)
 \item{eta.wls}{current value of the linear predictor}
 
 \item{model.options}{the model options for the current run}
+
+\item{eta.null}{the value of the linear predictor for a null model - logit(p event)}
 }
 \description{
 Single iteration of weighted least squares

@@ -4,8 +4,8 @@
 \alias{plot.trace.dirichlet.fit}
 \title{plot.trace.dirichlet.fit}
 \usage{
-\method{plot}{trace.dirichlet.fit}(fit, type = "expectation", groups = NULL,
-  params = NULL)
+\method{plot}{trace.dirichlet.fit}(fit, type = "expectation",
+  groups = NULL, params = NULL)
 }
 \arguments{
 \item{fit}{the Dirichlet model fit}

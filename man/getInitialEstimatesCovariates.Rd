@@ -5,12 +5,14 @@
 \title{Fit a simple linear model to get initial values for regression
 coefficients associated with covariates}
 \usage{
-getInitialEstimatesCovariates(dist, covariates, outcomes)
+getInitialEstimatesCovariates(dist, covariates, times, outcomes)
 }
 \arguments{
 \item{dist}{the distribution of the outcome ("gaussian" or "binary")}
 
-\item{covariates}{date frame containing covariate values}
+\item{covariates}{data frame containing covariate values}
+
+\item{times}{vector of observation times}
 
 \item{outcomes}{vector of outcomes}
 }

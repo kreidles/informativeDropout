@@ -4,10 +4,10 @@
 \alias{updateRandomEffects.binary}
 \title{Update the random effects}
 \usage{
-updateRandomEffects.binary(numSubjects, numObservations, firstObsPerSubject,
-  subjectsPerGroup, ids, outcomes, times.observation, covariates, X, Theta, Z,
-  alpha, betaCovariates, sigma.randomIntercept, sigma.randomSlope,
-  sigma.randomInterceptSlope)
+updateRandomEffects.binary(numSubjects, numObservations,
+  firstObsPerSubject, subjectsPerGroup, ids, outcomes, times.observation,
+  covariates, X, Theta, Z, alpha, betaCovariates, sigma.randomIntercept,
+  sigma.randomSlope, sigma.randomInterceptSlope)
 }
 \description{
 Update the random effects

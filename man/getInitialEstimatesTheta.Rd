@@ -5,14 +5,18 @@
 \title{Fit a simple linear model to get initial values for regression
 coefficients associated with splines}
 \usage{
-getInitialEstimatesTheta(dist, groupList, X, outcomes)
+getInitialEstimatesTheta(dist, groupList, groups, X, covariates, outcomes)
 }
 \arguments{
 \item{dist}{the distribution of the outcome ("gaussian" or "binary")}
 
 \item{groupList}{list of groups}
 
+\item{groups}{vector of group assignments}
+
 \item{X}{data frame containing predictor variables (assumes a column of ones for an intercept)}
+
+\item{covariates}{data frame containing covariate values}
 
 \item{outcomes}{vector of outcomes}
 }
