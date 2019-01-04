@@ -14,7 +14,7 @@
 data("untreated_hiv")
 
 # set model options
-# Note the nuber of iterations has been reduced so the example code will
+# Note the number of iterations has been reduced so the example code will
 # run quickly.  The models may not converge with this number of iterations.  
 # Due to the stochastic nature of MCMC, results may not be reproduced exactly. 
 model.options <- bayes.splines.model.options(
@@ -93,7 +93,7 @@ candidates <- seq(min(treated_hiv$drop_year), max(treated_hiv$drop_year),1/12)
 starting <- candidates[c(seq(1, length(candidates), length(candidates)/4),length(candidates))]
 
 # set the model options
-# Note the nuber of iterations has been reduced so the example code will
+# Note the number of iterations has been reduced so the example code will
 # run quickly.  The models may not converge with this number of iterations.  
 # Due to the stochastic nature of MCMC, results may not be reproduced exactly. 
 model.options <- bayes.splines.model.options(iterations=10000, burnin=5000, thin=1,print=1000,
