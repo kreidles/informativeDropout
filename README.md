@@ -45,7 +45,13 @@ The demo will run for 200,000 iterations may take up to 24 hours to run, dependi
 
 ### Instructions for replicating results in "A Bayesian Natural Cubic B Spline Varying Coefficient Method for Non-Ignorable Dropout"
 
-(coming soon)
+Install the informativeDropout package as described above.
+
+Run the DP model demo program
+
+```R
+demo(smmr_spline_paper)
+```
 
 
 
