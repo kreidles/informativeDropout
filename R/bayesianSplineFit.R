@@ -518,7 +518,7 @@ removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dro
   } 
   
   # calculate residuals
-  eta.wls <- eta.null + zAlpha + covariates
+  eta.wls <- eta.null + zAlpha + cBeta
   Theta.LSXprev <- wls.binary(y, X.previous, eta.wls, model.options, eta.null)
   Theta.LSXstar <- wls.binary(y, X.star, eta.wls, model.options, eta.null)
   Theta.LSresid <- Theta.previous - Theta.LSXprev
