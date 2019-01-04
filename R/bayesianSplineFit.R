@@ -268,13 +268,12 @@ bayes.splines.fit <- function(model.options, dist, groups, covariates.var, itera
 addKnot.binary <- function(model.options, knots.previous, knots.positions.candidate, 
                            outcomes, times.dropout, times.observation, 
                            covariates, X.previous, Theta.previous,
-                           Z, alpha, betaCovariates) {
+                           Z, alpha, betaCovariates, eta.null) {
   
   # get the relevant priors from the model options
   sigma.residual <- model.options$sigma.residual
   sigma.beta <- model.options$sigma.beta
   lambda.numKnots <- model.options$lambda.numKnots
-  eta.null <- model.options$eta.null
   
   # add a knot by randomly selecting a candidate knot
   candidatePositions = knots.positions.candidate[!(knots.positions.candidate %in% knots.previous)]
@@ -482,13 +481,12 @@ addKnot.gaussian <- function(model.options, knots.previous, knots.positions.cand
 #' 
 removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dropout, 
                               times.observation, covariates,
-                              X.previous, Theta.previous, Z, alpha, betaCovariates) {
+                              X.previous, Theta.previous, Z, alpha, betaCovariates,eta.null) {
   
   # get the relevant priors from the model options
   sigma.residual <- model.options$sigma.residual
   sigma.beta <- model.options$sigma.beta
   lambda.numKnots <- model.options$lambda.numKnots
-  eta.null <- model.options$eta.null
   
   # randomly remove an existing knot
   index = sample(1:length(knots.previous), 1)
@@ -685,7 +683,7 @@ moveKnot.binary <- function(model.options, knots.previous, knots.positions.candi
   sigma.residual <- model.options$sigma.residual
   sigma.beta <- model.options$sigma.beta
   lambda.numKnots <- model.options$lambda.numKnots
-  eta.null <- model.options$eta.null
+  
   # candidate positions
   potentialLocations = knots.positions.candidate[! knots.positions.candidate %in% knots.previous]
   # step size for moving a knot
@@ -881,7 +879,6 @@ updateFixedEffects.binary <- function(model.options, knots.previous,
   # priors
   sigma.beta <- model.options$sigma.beta
   lambda.numKnots <- model.options$lambda.numKnots
-  eta.null <- model.options$eta.null
   
   # build components of eta
   y <- outcomes
@@ -2147,10 +2144,14 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
   
   # for binary case, initialize eta
   if (dist == 'binary') {
-    if (is.null(model.options$eta.null)) {
-      eta.null = model.options$eta.null
+    if (!is.null(model.options$eta.null)) {
+      model.options$eta.null = model.options$eta.null
     } else {
-      eta.null = logit(sum(outcomes)/length(outcomes))
+      model.options$eta.null <- lapply(1:length(groupList), function(i) { 
+        group = groupList[[i]]
+        groupY = data[data[,groups.var] == group,outcomes.var]
+        return(logit(sum(groupY)/length(groupY)))
+      })
     }
   }
   
@@ -2226,7 +2227,7 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                                   group.outcomes, group.times.dropout, group.times.observation, 
                                   group.covariates, X[[group.index]], 
                                   model.current$Theta[[group.index]], group.Z, group.alpha, 
-                                  model.current$betas.covariates)
+                                  model.current$betas.covariates, model.options$eta.null[[group.index]])
         }
         
         # update the model iteration
@@ -2250,7 +2251,8 @@ informativeDropout.bayes.splines <- function(data, ids.var, outcomes.var, groups
                                      group.outcomes, group.times.dropout, 
                                      group.times.observation, group.covariates,
                                      X[[group.index]], model.current$Theta[[group.index]], 
-                                     group.Z, group.alpha, model.current$betas.covariates)
+                                     group.Z, group.alpha, model.current$betas.covariates, 
+                                     model.options$eta.null[[group.index]])
         }
         # update the model iteration
         X[[group.index]] = result$X
