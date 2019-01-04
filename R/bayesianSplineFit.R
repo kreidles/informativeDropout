@@ -296,11 +296,11 @@ addKnot.binary <- function(model.options, knots.previous, knots.positions.candid
   y = outcomes
   if (!is.null(covariates)) {
     cBeta = as.vector(as.matrix(covariates) %*% betaCovariates)
-  }
+  }else{cBeta = rep(0, length(times.observation))}
   zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
   
   # calculate residuals
-  eta.wls <- eta.null + zAlpha + ifelse(!is.null(covariates), cBeta, 0)
+  eta.wls <- eta.null + zAlpha + cBeta
   Theta.LSXprev <- wls.binary(y, X.previous, eta.wls, model.options)
   Theta.LSXstar <- wls.binary(y, X.star, eta.wls, model.options)
   Theta.LSresid <- Theta.previous - Theta.LSXprev
@@ -325,7 +325,7 @@ addKnot.binary <- function(model.options, knots.previous, knots.positions.candid
   probDeath <- ifelse(length(knots.previous) == model.options$knots.max - 1, 1, 1 - model.options$knots.prob.birth)
   
   # calculate the previous eta and associated probability
-  eta.previous = as.vector(X.previous %*% Theta.previous + zAlpha + ifelse(!is.null(covariates), cBeta, 0))
+  eta.previous = as.vector(X.previous %*% Theta.previous + zAlpha + cBeta)
   prob.previous = inv.logit(eta.previous)
   # adjust probabilities within tolerance levels
   prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
@@ -334,7 +334,7 @@ addKnot.binary <- function(model.options, knots.previous, knots.positions.candid
   
   
   # calculate the proposal eta and associated probability
-  eta.star = as.vector(X.star %*% Theta.star + zAlpha + ifelse(!is.null(covariates), cBeta, 0))
+  eta.star = as.vector(X.star %*% Theta.star + zAlpha + cBeta)
   prob.star = inv.logit(eta.star)
   # adjust probabilities within tolerance levels
   prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
@@ -511,7 +511,7 @@ removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dro
   y = as.matrix(outcomes)
   if (!is.null(covariates)) {
     cBeta = as.vector(as.matrix(covariates) %*% betaCovariates)
-  }
+  }else{cBeta = rep(0, length(times.observation))}
   zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
   
   yls <- as.vector(y - zAlpha)
@@ -520,7 +520,7 @@ removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dro
   } 
   
   # calculate residuals
-  eta.wls <- eta.null + zAlpha + ifelse(!is.null(covariates), cBeta, 0)
+  eta.wls <- eta.null + zAlpha + covariates
   Theta.LSXprev <- wls.binary(y, X.previous, eta.wls, model.options)
   Theta.LSXstar <- wls.binary(y, X.star, eta.wls, model.options)
   Theta.LSresid <- Theta.previous - Theta.LSXprev
@@ -531,7 +531,7 @@ removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dro
   
   
   # calculate the previous eta and associated probability
-  eta.previous = as.vector(X.previous %*% Theta.previous + ifelse(!is.null(covariates), cBeta, 0) + zAlpha)
+  eta.previous = as.vector(X.previous %*% Theta.previous + cBeta + zAlpha)
   prob.previous = inv.logit(eta.previous)
   # adjust probabilities within tolerance levels
   prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
@@ -539,7 +539,7 @@ removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dro
   loglikelihood.previous <- sum(log((1 - prob.previous[outcomes==0]))) + sum(log(prob.previous[outcomes==1]))    
   
   # calculate the proposal eta and associated probability
-  eta.star = as.vector(X.star %*% Theta.star + ifelse(!is.null(covariates), cBeta, 0) + zAlpha)
+  eta.star = as.vector(X.star %*% Theta.star + cBeta + zAlpha)
   prob.star = inv.logit(eta.star)
   # adjust probabilities within tolerance levels
   prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
@@ -735,11 +735,11 @@ moveKnot.binary <- function(model.options, knots.previous, knots.positions.candi
     y = as.matrix(outcomes)
     if (!is.null(covariates)) {
       cBeta = as.vector(as.matrix(covariates) %*% betaCovariates)
-    }
+    }else{cBeta = rep(0, length(times.observation))}
     zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
     
     # calculate the previous eta and associated probability
-    eta.previous = as.vector(X.previous %*% Theta.previous + ifelse(!is.null(covariates), cBeta, 0) + zAlpha)
+    eta.previous = as.vector(X.previous %*% Theta.previous + cBeta + zAlpha)
     prob.previous = inv.logit(eta.previous)
     # adjust probabilities within tolerance levels
     prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
@@ -747,7 +747,7 @@ moveKnot.binary <- function(model.options, knots.previous, knots.positions.candi
     loglikelihood.previous <- sum(log((1 - prob.previous[outcomes==0]))) + sum(log(prob.previous[outcomes==1]))    
     
     # calculate the proposal eta and associated probability
-    eta.star = as.vector(X.star %*% Theta.previous + ifelse(!is.null(covariates), cBeta, 0) + zAlpha)
+    eta.star = as.vector(X.star %*% Theta.previous + cBeta + zAlpha)
     prob.star = inv.logit(eta.star)
     # adjust probabilities within tolerance levels
     prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
@@ -887,12 +887,12 @@ updateFixedEffects.binary <- function(model.options, knots.previous,
   y <- outcomes
   if (!is.null(covariates)) {
     cBeta = as.vector(as.matrix(covariates) %*% betaCovariates)
-  }
+  }else{cBeta = rep(0, length(times.observation))}
   zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
   
   XTheta.previous = X.previous %*% Theta.previous 
   # calculate the previous eta and associated probability
-  eta.previous = as.vector(XTheta.previous + ifelse(!is.null(covariates), cBeta, 0) + zAlpha)
+  eta.previous = as.vector(XTheta.previous + cBeta + zAlpha)
   prob.previous = inv.logit(eta.previous)
   # adjust probabilities within tolerance levels
   prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
@@ -915,7 +915,7 @@ updateFixedEffects.binary <- function(model.options, knots.previous,
   
   # get proposal probabilities
   XTheta.star = X.previous %*% Theta.star
-  eta.star <- XTheta.star + ifelse(!is.null(covariates), cBeta, 0) + zAlpha
+  eta.star <- XTheta.star + cBeta + zAlpha
   prob.star = inv.logit(eta.star)
   # adjust probabilities within tolerance levels
   prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
@@ -1168,7 +1168,7 @@ updateRandomEffects.binary <- function(numSubjects, numObservations, firstObsPer
   if (!is.null(covariates)) {
     C = as.matrix(covariates)
     cBeta = as.vector(C %*% betaCovariates)
-  }
+  }else{cBeta = rep(0, length(times.observation))}
   
   # build X * beta for each group and combine into a single vector
   XTheta = vector()
@@ -1179,7 +1179,7 @@ updateRandomEffects.binary <- function(numSubjects, numObservations, firstObsPer
   
   zAlpha.previous = Z[,2] * alpha[,1] + Z[,3] * alpha[,2]
   # calculate the previous eta and associated probability
-  eta.previous = as.vector(XTheta + ifelse(!is.null(covariates), cBeta, 0) + zAlpha.previous)
+  eta.previous = as.vector(XTheta + cBeta + zAlpha.previous)
   prob.previous = inv.logit(eta.previous)
   # adjust probabilities within tolerance levels
   prob.previous[prob.previous < model.options$prob.min] <-  model.options$prob.min
@@ -1198,7 +1198,7 @@ updateRandomEffects.binary <- function(numSubjects, numObservations, firstObsPer
   # calculate the proposal log likelihood
   zAlpha.star = Z[,2] * rep(alpha.star.intercept, numObservations) + Z[,3] * rep(alpha.star.slope, numObservations)
   # calculate the previous eta and associated probability
-  eta.star = as.vector(XTheta + ifelse(!is.null(covariates), cBeta, 0) + zAlpha.star)
+  eta.star = as.vector(XTheta + cBeta + zAlpha.star)
   prob.star = inv.logit(eta.star)
   # adjust probabilities within tolerance levels
   prob.star[prob.star < model.options$prob.min] <-  model.options$prob.min
