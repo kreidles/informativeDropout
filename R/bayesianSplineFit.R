@@ -1137,7 +1137,7 @@ updateFixedEffectsCovariates.gaussian <- function(model.options, outcomes, covar
   rho<-sum(log(dnorm(as.vector(resid.star), 0, sqrt(sigma.error)))) + 
     log(dmvnorm(betaCovariates.star, rep(0, ncol(covariates)), covarBeta)) + 
     log(dmvnorm(betaCovariates.previous, proposedMean, proposedCovariance)) - 
-    sum(log(dnorm(resid.star, 0, sqrt(sigma.error)))) - 
+    sum(log(dnorm(resid.previous, 0, sqrt(sigma.error)))) - 
     log(dmvnorm(betaCovariates.previous, rep(0, ncol(covariates)), covarBeta)) - 
     log(dmvnorm(betaCovariates.star, proposedMean, proposedCovariance))
   
