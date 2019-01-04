@@ -68,7 +68,7 @@ sensitivity <- function(fit, ...) {
 #' @param eta.wls current value of the linear predictor
 #' @param model.options the model options for the current run
 #' 
-wls.binary <- function(y, X, eta.wls, model.options) { 
+wls.binary <- function(y, X, eta.wls, model.options, eta.null) { 
   
   # get the probability from the linear predictor
   prob <- inv.logit(eta.wls)
@@ -78,7 +78,7 @@ wls.binary <- function(y, X, eta.wls, model.options) {
   
   # calculate the weight matrix and estimates 
   var = (prob * (1 - prob))
-  y.wls <- model.options$eta.null + (y - prob) * (1 / var)
+  y.wls <- eta.null + (y - prob) * (1 / var)
   weight <- Diagonal(x = var)
   result <- solve(as.matrix(nearPD(crossprod(X, as.matrix(weight %*% X)))$mat)) %*% (crossprod(X, as.matrix(weight %*% y.wls)))
   return(as.vector(result))
