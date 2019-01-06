@@ -7,11 +7,15 @@
 #
 #
 require(pbapply)
+
 ##################################################
 # Analysis of untreated subjects
 ##################################################
 # load the data set of untreated hiv participants
 data("untreated_hiv")
+
+# Calculate dropout year
+untreated_hiv$drop_years = untreated_hiv$drop_day / 365
 
 # set model options
 # Note the number of iterations has been reduced so the example code will
@@ -20,9 +24,9 @@ data("untreated_hiv")
 model.options <- bayes.splines.model.options(
   iterations=10000, burnin=5000, thin=1, print=1000,
   knots.prob.birth=0.2, knots.min=1, knots.max=10, knots.stepSize=15*3,
-  knots.positions.start=list(c(142, 562, 982, 1402, 1822), c(139, 559, 979, 1399, 1819)),
-  knots.positions.candidate=list(seq(142,1826,15),seq(139,1826,15)),
-  dropout.estimationTimes=c(1,2,3)*365,
+  knots.positions.start=list(c(142, 562, 982, 1402, 1822)/365, c(139, 559, 979, 1399, 1819)/365),
+  knots.positions.candidate=list(seq(142,1826,15)/365,seq(139,1826,15)/365),
+  dropout.estimationTimes=c(1,2,3),
   sigma.error=1,
   sigma.error.shape.tau=0.001, sigma.error.rate.tau=0.001,
   sigma.beta=25, lambda.numKnots=5,
@@ -38,7 +42,7 @@ ids.var = "patid"
 outcomes.var = "logcd4"
 groups.var = "hard_drug"
 covariates.var = c("baselogcd4", "baselogcd4_years")
-times.dropout.var = "drop_day"
+times.dropout.var = "drop_years"
 times.observation.var = "years"
 
 # set the model fitting method
@@ -87,7 +91,7 @@ length(diff[diff<0])/length(diff)
 # deltas of 0, 0.25, 0.5, and 0.75
 #
 # To perform sensitivity analysis, we first create a dataframe with one row
-# per subject. Note that we change the drop out time units to years
+# per subject. 
 
 # number of observations per subject
 numObservations = sapply(unique(untreated_hiv[,ids.var]), function(id) {
@@ -96,14 +100,21 @@ numObservations = sapply(unique(untreated_hiv[,ids.var]), function(id) {
 # index of the first observation per subject
 firstObsPerSubject = c(1,1+cumsum(numObservations)[-length(numObservations)])
 data.onePerSubject = untreated_hiv[firstObsPerSubject,]
-data.onePerSubject$drop_years = data.onePerSubject$drop_day / 365
+
+# we perform the sensitivity analysis assuming a baseline CD4 count of 478.5
+data.onePerSubject$baselogcd4 = log(478.5)
+
+# for time interacted covariates, set the value of the covariate*time when time = 1
+# so they can be included as part of the slope
+data.onePerSubject$baselogcd4_years = log(478.5)
+
 sens.fit = sensitivity(fit, 
                        times.estimation=(1:4), deltas=c(0, 0.25, 0.5, 0.75),
                        data.onePerSubject, 
                        times.dropout.var="drop_years", group.var=groups.var, 
                        covariates.time.var=c("baselogcd4_years"), 
                        covariates.nontime.var=c("baselogcd4"))
-summary(sens.fit) 
+summary(sens.fit)
 
 #######################################################
 # Analysis of Treated Subjects: Viral Load Suppression
@@ -162,7 +173,6 @@ fit = informativeDropout(treated_hiv, model.options, ids.var,
 summary(fit)
 
 # To calculate slope for subject with baseline CD4 of 267, log10VL of 4.2:
-
 others.slope<-do.call(rbind, pblapply(fit$iterations, function(x){
   x$slope.marginal[[1]]+x$betas.covariates[3]*log(267) + x$betas.covariates[4]*4.2
 }))
@@ -204,6 +214,17 @@ numObservations = sapply(unique(treated_hiv[,ids.var]), function(id) {
 # index of the first observation per subject
 firstObsPerSubject = c(1,1+cumsum(numObservations)[-length(numObservations)])
 data.onePerSubject = treated_hiv[firstObsPerSubject,]
+
+# we perform the sensitivity analysis assuming a baseline CD4 count of 267
+# and baseline log10vl of 4.2
+data.onePerSubject$baselogcd4 = log(267)
+data.onePerSubject$baselog10vl = 4.2
+
+# for time interacted covariates, set the value of the covariate*time when time = 1
+# so they can be included as part of the slope
+data.onePerSubject$baselogcd4_years = log(267)
+data.onePerSubject$baselog10vl_years = 4.2
+
 sens.fit = sensitivity(fit, 
                        times.estimation=(1:4), deltas=c(0, 0.25, 0.5, 0.75),
                        data.onePerSubject, 
