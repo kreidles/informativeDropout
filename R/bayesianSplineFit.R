@@ -295,7 +295,9 @@ addKnot.binary <- function(model.options, knots.previous, knots.positions.candid
   y = outcomes
   if (!is.null(covariates)) {
     cBeta = as.vector(as.matrix(covariates) %*% betaCovariates)
-  }else{cBeta = rep(0, length(times.observation))}
+  } else {
+    cBeta = rep(0, length(times.observation))
+  }
   zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
   
   # calculate residuals
@@ -509,7 +511,9 @@ removeKnot.binary <- function(model.options, knots.previous, outcomes, times.dro
   y = as.matrix(outcomes)
   if (!is.null(covariates)) {
     cBeta = as.vector(as.matrix(covariates) %*% betaCovariates)
-  }else{cBeta = rep(0, length(times.observation))}
+  } else {
+    cBeta = rep(0, length(times.observation))
+  }
   zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
   
   yls <- as.vector(y - zAlpha)
@@ -733,7 +737,9 @@ moveKnot.binary <- function(model.options, knots.previous, knots.positions.candi
     y = as.matrix(outcomes)
     if (!is.null(covariates)) {
       cBeta = as.vector(as.matrix(covariates) %*% betaCovariates)
-    }else{cBeta = rep(0, length(times.observation))}
+    } else {
+      cBeta = rep(0, length(times.observation))
+    }
     zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
     
     # calculate the previous eta and associated probability
@@ -884,7 +890,9 @@ updateFixedEffects.binary <- function(model.options, knots.previous,
   y <- outcomes
   if (!is.null(covariates)) {
     cBeta = as.vector(as.matrix(covariates) %*% betaCovariates)
-  }else{cBeta = rep(0, length(times.observation))}
+  } else {
+    cBeta = rep(0, length(times.observation))
+  }
   zAlpha = Z[,1] * alpha[,1] + Z[,2] * alpha[,2]
   
   XTheta.previous = X.previous %*% Theta.previous 
@@ -1165,7 +1173,9 @@ updateRandomEffects.binary <- function(numSubjects, numObservations, firstObsPer
   if (!is.null(covariates)) {
     C = as.matrix(covariates)
     cBeta = as.vector(C %*% betaCovariates)
-  }else{cBeta = rep(0, length(times.observation))}
+  } else {
+    cBeta = rep(0, length(times.observation))
+  }
   
   # build X * beta for each group and combine into a single vector
   XTheta = vector()
@@ -1746,15 +1756,20 @@ sensitivity.bayes.splines.fit <- function(fit, times.estimation, deltas,
       
       spline <- ns(times.dropout.group, knots = knots.interior, Boundary.knots = knots.boundary, intercept=T)
 
-      preDropoutSlope[, i] = (
-        spline %*% Theta_noint + 
-          ifelse(!is.null(betas.covariates.time), as.matrix(data.group[,covariates.time.var]) %*% betas.covariates.time, 0)
-      )
+      if (!is.null(betas.covariates.time)) {
+        cBeta.time = as.matrix(data.group[,covariates.time.var]) %*% betas.covariates.time
+      } else {
+        cBeta.time = 0
+      }
+      preDropoutSlope[, i] = (spline %*% Theta_noint + cBeta.time)
+      
       # intercept plus non-time interacted covariates
-      timeZero[, i] = (
-        Theta_int + 
-          ifelse(!is.null(betas.covariates.nontime), as.matrix(data.group.covar.nontime) %*% betas.covariates.nontime, 0)
-      )
+      if (!is.null(betas.covariates.nontime)) {
+        cBeta.nontime = as.matrix(data.group.covar.nontime) %*% betas.covariates.nontime
+      } else {
+        cBeta.nontime = 0
+      }
+      timeZero[, i] = (Theta_int + cBeta.nontime)
     }
     
     return(list(group=group, slope=preDropoutSlope, timeZero=timeZero))
@@ -1796,6 +1811,17 @@ sensitivity.bayes.splines.fit <- function(fit, times.estimation, deltas,
   return(sensitivity.fit)
 }
 
+#'
+#' summary.sensitivity.bayes.splines.fit
+#' 
+#' Summarize sensitivity analysis results for a Bayesian spline model
+#'
+#' @param sensitivity.fit the fit object from a call to sensitivity for a 'bayes.splines' model
+#' @param tail.lower lower tail for confidence bounds
+#' @param tail.upper upper tail for confidence bounds
+#' 
+#' @export summary.sensitivity.bayes.splines.fit 
+#'
 summary.sensitivity.bayes.splines.fit <- function(sensitivity.fit, tail.lower=0.025, tail.upper=0.975) {
   result = list()
   for(group.info in sensitivity.fit$sensitivity) {

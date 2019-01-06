@@ -57,7 +57,7 @@ plot.slopeByDropout <- function (fit, ...) {
 #' @param fit the model fit object
 #' @export 
 sensitivity <- function(fit, ...) {
-  UseMethod("sensitivity.slope", fit)
+  UseMethod("sensitivity", fit)
 }
 
 #'

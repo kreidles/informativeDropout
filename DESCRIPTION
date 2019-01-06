@@ -13,7 +13,7 @@ RoxygenNote: 6.1.1
 Depends:
     R (>= 3.3.0)
 Imports:
-    matrixcalc,MCMCpack,gtools,Matrix,splines,MASS,abind,mvtnorm,Hmisc,truncnorm
+    matrixcalc,MCMCpack,gtools,Matrix,splines,MASS,abind,mvtnorm,Hmisc,truncnorm,pbapply
 VignetteBuilder: knitr
 Collate:
     'generics.R'

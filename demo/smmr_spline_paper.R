@@ -6,7 +6,7 @@
 # 2018, under review.
 #
 #
-
+require(pbapply)
 ##################################################
 # Analysis of untreated subjects
 ##################################################
@@ -81,6 +81,29 @@ quantile(diff, c(0.025, 0.975))
 
 # Calculate Posterior P Value for difference in slopes < 0
 length(diff[diff<0])/length(diff)
+
+# sensitivity analysis
+# Estimate slopes at 1 to 4 years, if we adjust by 
+# deltas of 0, 0.25, 0.5, and 0.75
+#
+# To perform sensitivity analysis, we first create a dataframe with one row
+# per subject. Note that we change the drop out time units to years
+
+# number of observations per subject
+numObservations = sapply(unique(untreated_hiv[,ids.var]), function(id) {
+  return(nrow(untreated_hiv[untreated_hiv[,ids.var] == id,]))
+})
+# index of the first observation per subject
+firstObsPerSubject = c(1,1+cumsum(numObservations)[-length(numObservations)])
+data.onePerSubject = untreated_hiv[firstObsPerSubject,]
+data.onePerSubject$drop_years = data.onePerSubject$drop_day / 365
+sens.fit = sensitivity(fit, 
+                       times.estimation=(1:4), deltas=c(0, 0.25, 0.5, 0.75),
+                       data.onePerSubject, 
+                       times.dropout.var="drop_years", group.var=groups.var, 
+                       covariates.time.var=c("baselogcd4_years"), 
+                       covariates.nontime.var=c("baselogcd4"))
+summary(sens.fit) 
 
 #######################################################
 # Analysis of Treated Subjects: Viral Load Suppression
@@ -166,3 +189,25 @@ quantile(diff, c(0.025, 0.975))
 
 # Calculate Posterior P Value for difference in slopes < 0
 length(diff[diff<0])/length(diff)
+
+# sensitivity analysis
+# Estimate slopes at 1 to 4 years, if we adjust by 
+# deltas of 0, 0.25, 0.5, and 0.75
+#
+# To perform sensitivity analysis, we first create a dataframe with one row
+# per subject. 
+
+# number of observations per subject
+numObservations = sapply(unique(treated_hiv[,ids.var]), function(id) {
+  return(nrow(treated_hiv[treated_hiv[,ids.var] == id,]))
+})
+# index of the first observation per subject
+firstObsPerSubject = c(1,1+cumsum(numObservations)[-length(numObservations)])
+data.onePerSubject = treated_hiv[firstObsPerSubject,]
+sens.fit = sensitivity(fit, 
+                       times.estimation=(1:4), deltas=c(0, 0.25, 0.5, 0.75),
+                       data.onePerSubject, 
+                       times.dropout.var=times.dropout.var, group.var=groups.var, 
+                       covariates.time.var=c("baselogcd4_years", "baselog10vl_years"), 
+                       covariates.nontime.var=c("baselogcd4", "baselog10vl"))
+summary(sens.fit) 
