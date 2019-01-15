@@ -40,6 +40,7 @@
 #' @param sigma.error For Gaussian outcomes, the residual error variance
 #' @param expected.intercept expected value of the random intercepts
 #' @param expected.slope expected value of the random slopes
+#' @param intercept.dropoutTimes estimated intercepts by dropout times
 #' @param slope.dropoutTimes estimated slopes by dropout times
 #' @param density.intercept estimated density of the random intercepts
 #' @param density.slope estimated density of the random slopes
@@ -60,6 +61,7 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
                                 cluster.mu=NULL, 
                                 sigma.error = NULL,
                                 expected.intercept=NULL, expected.slope=NULL,
+                                intercept.dropoutTimes=NULL,
                                 slope.dropoutTimes=NULL,
                                 density.intercept = NULL,
                                 density.slope = NULL) {
@@ -100,6 +102,8 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
     # expected values of the random intercept and slope
     expected.intercept = expected.intercept,
     expected.slope = expected.slope,
+    # estimated intercepts at specified dropout times
+    intercept.dropoutTimes = intercept.dropoutTimes,
     # estimated slopes at specified dropout times
     slope.dropoutTimes = slope.dropoutTimes,
     # densities of the random effects
@@ -470,11 +474,30 @@ summary.dirichlet.fit <- function(fit, upper_tail=0.975, lower_tail=0.025) {
     }  
     row.names(slopes_by_dropout_time) = NULL
     
+    ## dropout time specific intercepts
+    intercepts_by_dropout_time = data.frame(
+      time=model.options$dropout.estimationTimes,
+      mean=numeric(length(model.options$dropout.estimationTimes)),
+      median=numeric(length(model.options$dropout.estimationTimes)),
+      ci_lower=numeric(length(model.options$dropout.estimationTimes)),
+      ci_upper=numeric(length(model.options$dropout.estimationTimes))
+    )
+    for (time.index in 1:(length(model.options$dropout.estimationTimes))) {
+      int_sample <- unlist(lapply(iterations, function(x) { 
+        return(x$intercept.dropoutTimes[[group.index]][time.index])
+      }))
+      intercepts_by_dropout_time$mean[time.index] = mean(int_sample)
+      intercepts_by_dropout_time$median[time.index] = median(int_sample)
+      intercepts_by_dropout_time$ci_lower[time.index] = quantile(int_sample, na.rm=TRUE, probs=lower_tail)
+      intercepts_by_dropout_time$ci_upper[time.index] = quantile(int_sample, na.rm=TRUE, probs=upper_tail)
+    }  
+    row.names(intercepts_by_dropout_time) = NULL
     # build the summary list
     result.summary[[paste("group", group, sep="_")]] = list(
       total_clusters = total_clusters,
       subject_specific_effects = subject_specific_effects,
       covariance_parameters = covariance_parameters,
+      intercepts_by_dropout_time = intercepts_by_dropout_time,
       slopes_by_dropout_time = slopes_by_dropout_time
     )
   }
@@ -1141,6 +1164,13 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       return (rep(0,length(model.options$dropout.estimationTimes)))
     })
   }
+  # initialize the intercept estimates at each droptime
+  start.intercept.dropoutTimes = NULL
+  if (!is.null(model.options$dropout.estimationTimes)) {
+    start.intercept.dropoutTimes = lapply(groupList, function(group) {
+      return (rep(0,length(model.options$dropout.estimationTimes)))
+    })
+  }
   
   # initialize the regression coefficients for the random intercept
   # and slope.  We append the log of the dropout time
@@ -1217,6 +1247,7 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     cluster.N = n.perCluster,
     cluster.mu=cluster.mu, 
     expected.intercept=rep(0, length(groupList)), expected.slope=rep(0, length(groupList)),
+    intercept.dropoutTimes = start.intercept.dropoutTimes,
     slope.dropoutTimes = start.slope.dropoutTimes,
     sigma.error = sigma.error
   )
@@ -1601,9 +1632,17 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
                      (log(dropoutTime) - model.current$cluster.mu[[group.index]][,3]) /
                      covar[3,3]))
           )
+          model.current$intercept.dropoutTimes[[group.index]][u] = (  
+            sum(p[u,] * 
+                  (model.current$cluster.mu[[group.index]][,1] + 
+                     covar[1,3] *                               
+                     (log(dropoutTime) - model.current$cluster.mu[[group.index]][,3]) /
+                     covar[3,3]))
+          )
         }
       } else {
         model.current$slope.dropoutTimes = NULL
+        model.current$intercept.dropoutTimes = NULL 
       }
       
       # Estimate E(B1), E(B0) - section 2.4 expectation of random effects (int, slope)
