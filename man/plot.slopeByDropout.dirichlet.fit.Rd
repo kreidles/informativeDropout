@@ -4,7 +4,7 @@
 \alias{plot.slopeByDropout.dirichlet.fit}
 \title{plot.slopeByDropout.dirichlet.fit}
 \usage{
-\method{plot}{slopeByDropout.dirichlet.fit}(fit, groups = NULL,
+\method{plot.slopeByDropout}{dirichlet.fit}(fit, groups = NULL,
   xlim = NULL, ylim = NULL, show_ci = TRUE, overlay = TRUE,
   lower_tail = 0.025, upper_tail = 0.975, colors = NULL)
 }

@@ -11,8 +11,10 @@ dirichlet.iteration(weights.mixing = NULL, weights.conditional = NULL,
   dp.dist.sigma0 = NULL, dp.cluster.sigma = NULL,
   dp.concentration = NULL, cluster.N = NULL, cluster.mu = NULL,
   sigma.error = NULL, expected.intercept = NULL,
-  expected.slope = NULL, slope.dropoutTimes = NULL,
-  density.intercept = NULL, density.slope = NULL)
+  expected.slope = NULL, intercept.dropoutTimes = NULL,
+  slope.dropoutTimes = NULL, intercept.dropoutTimes.censored = NULL,
+  slope.dropoutTimes.censored = NULL, density.intercept = NULL,
+  density.slope = NULL)
 }
 \arguments{
 \item{weights.mixing}{vector containing the probability of belonging to cluster k, 
@@ -59,7 +61,13 @@ in cluster k, for k = 1 to the number of clusters}
 
 \item{expected.slope}{the expected value of the random slope}
 
+\item{intercept.dropoutTimes}{estimated intercepts by dropout times}
+
 \item{slope.dropoutTimes}{estimated slopes by dropout times}
+
+\item{intercept.dropoutTimes.censored}{estimated intercepts by censored dropout times}
+
+\item{slope.dropoutTimes.censored}{estimated slopes by censored dropout times}
 
 \item{density.intercept}{estimated density of the random intercepts}
 

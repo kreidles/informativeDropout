@@ -4,7 +4,7 @@
 \alias{plot.density.dirichlet.fit}
 \title{plot.density.dirichlet.fit}
 \usage{
-\method{plot}{density.dirichlet.fit}(fit, params = NULL, groups = NULL,
+\method{plot.density}{dirichlet.fit}(fit, params = NULL, groups = NULL,
   overlay = TRUE, xlim = NULL, ylim = NULL, colors = NULL,
   lty = 1)
 }

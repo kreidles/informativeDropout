@@ -4,7 +4,7 @@
 \alias{plot.trace.bayes.splines.fit}
 \title{Create a trace plot of the specified parameter}
 \usage{
-\method{plot}{trace.bayes.splines.fit}(fit, type = "marginal_slope",
+\method{plot.trace}{bayes.splines.fit}(fit, type = "marginal_slope",
   groups = NULL, params = NULL)
 }
 \arguments{

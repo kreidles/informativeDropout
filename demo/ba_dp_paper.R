@@ -37,10 +37,11 @@ censoring.var = "delta"
 dist = "gaussian"
 method="dirichlet"
 
-model.options=dirichlet.model.options(iterations=200000, n.clusters=60, burnin=5000, thin=1,
+model.options=dirichlet.model.options(iterations=200, n.clusters=60, burnin=50, thin=1,
                                       print=100,
                                       dropout.offset=0,
-                                      dropout.estimationTimes = seq(2,13,1),
+                                      dropout.estimationTimes = c(1,2,3,4,5),
+                                      dropout.estimationTimes.censored = c(4,5),
                                       dp.concentration=1,
                                       dp.concentration.alpha=1,
                                       dp.concentration.beta=1,
@@ -58,8 +59,8 @@ model.options=dirichlet.model.options(iterations=200000, n.clusters=60, burnin=5
                                       betas.covariates.sigma = 100*diag(2),
                                       sigma.error = 1,
                                       sigma.error.tau = 0.001, 
-                                      density.slope.domain = seq(-4,3,0.1),
-                                      density.intercept.domain = seq(-4,3,0.1))
+                                      density.slope.domain = NULL,
+                                      density.intercept.domain = NULL)
 
 fit = informativeDropout(data, model.options, ids.var, 
                          outcomes.var, groups.var,

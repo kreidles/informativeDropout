@@ -6,7 +6,8 @@
 \usage{
 dirichlet.model.options(iterations = 10000, burnin = 500, thin = 1,
   print = 1, start.weights.mixing = NULL, n.clusters = 15,
-  dropout.estimationTimes = NULL, dropout.offset = 0,
+  dropout.estimationTimes = NULL,
+  dropout.estimationTimes.censored = NULL, dropout.offset = 0,
   dp.concentration = NULL, dp.concentration.alpha = NULL,
   dp.concentration.beta = NULL, dp.cluster.sigma = NULL,
   dp.cluster.sigma.nu0 = NULL, dp.cluster.sigma.T0 = NULL,
