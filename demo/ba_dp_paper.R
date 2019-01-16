@@ -37,8 +37,8 @@ censoring.var = "delta"
 dist = "gaussian"
 method="dirichlet"
 
-model.options=dirichlet.model.options(iterations=200, n.clusters=60, burnin=50, thin=1,
-                                      print=100,
+model.options=dirichlet.model.options(iterations=200000, n.clusters=60, burnin=50000, thin=1,
+                                      print=1000,
                                       dropout.offset=0,
                                       dropout.estimationTimes = c(1,2,3,4,5),
                                       dropout.estimationTimes.censored = c(4,5),
