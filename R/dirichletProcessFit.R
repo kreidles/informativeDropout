@@ -42,6 +42,8 @@
 #' @param expected.slope expected value of the random slopes
 #' @param intercept.dropoutTimes estimated intercepts by dropout times
 #' @param slope.dropoutTimes estimated slopes by dropout times
+#' @param intercept.dropoutTimes.censored estimated intercepts by censored dropout times
+#' @param slope.dropoutTimes.censored estimated slopes by censored dropout times
 #' @param density.intercept estimated density of the random intercepts
 #' @param density.slope estimated density of the random slopes
 #' 
@@ -63,6 +65,8 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
                                 expected.intercept=NULL, expected.slope=NULL,
                                 intercept.dropoutTimes=NULL,
                                 slope.dropoutTimes=NULL,
+                                intercept.dropoutTimes.censored=NULL,
+                                slope.dropoutTimes.censored=NULL,
                                 density.intercept = NULL,
                                 density.slope = NULL) {
   mi = list(
@@ -106,6 +110,10 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
     intercept.dropoutTimes = intercept.dropoutTimes,
     # estimated slopes at specified dropout times
     slope.dropoutTimes = slope.dropoutTimes,
+    # estimated intercepts at specified dropout times
+    intercept.dropoutTimes.censored = intercept.dropoutTimes.censored,
+    # estimated slopes at specified dropout times
+    slope.dropoutTimes.censored = slope.dropoutTimes.censored,
     # densities of the random effects
     density.intercept = density.intercept,
     density.slope = density.slope
@@ -166,7 +174,9 @@ dirichlet.iteration <- function(weights.mixing=NULL, weights.conditional=NULL,
 #' 
 dirichlet.model.options <- function(iterations=10000, burnin=500, thin=1, print=1,
                                     start.weights.mixing=NULL, n.clusters=15,
-                                    dropout.estimationTimes=NULL, dropout.offset=0,
+                                    dropout.estimationTimes=NULL, 
+                                    dropout.estimationTimes.censored=NULL,
+                                    dropout.offset=0,
                                     dp.concentration=NULL,
                                     dp.concentration.alpha=NULL,
                                     dp.concentration.beta=NULL,
@@ -277,6 +287,8 @@ dirichlet.model.options <- function(iterations=10000, burnin=500, thin=1, print=
     n.clusters = n.clusters,
     # times at which the dropout time dependent slopes will be estimated
     dropout.estimationTimes = dropout.estimationTimes,
+    # censored times at which the dropout time dependent slopes will be estimated
+    dropout.estimationTimes.censored = dropout.estimationTimes.censored,
     # offset to avoid dropout times of 0
     dropout.offset = dropout.offset,
     # prior concentration of the DP
@@ -492,13 +504,52 @@ summary.dirichlet.fit <- function(fit, upper_tail=0.975, lower_tail=0.025) {
       intercepts_by_dropout_time$ci_upper[time.index] = quantile(int_sample, na.rm=TRUE, probs=upper_tail)
     }  
     row.names(intercepts_by_dropout_time) = NULL
+    ## censored dropout time specific slopes
+    slopes_by_dropout_time.censored = data.frame(
+      time=model.options$dropout.estimationTimes.censored,
+      mean=numeric(length(model.options$dropout.estimationTimes.censored)),
+      median=numeric(length(model.options$dropout.estimationTimes.censored)),
+      ci_lower=numeric(length(model.options$dropout.estimationTimes.censored)),
+      ci_upper=numeric(length(model.options$dropout.estimationTimes.censored))
+    )
+    for (time.index in 1:(length(model.options$dropout.estimationTimes.censored))) {
+      slope_sample_censored <- unlist(lapply(iterations, function(x) { 
+        return(x$slope.dropoutTimes.censored[[group.index]][time.index])
+      }))
+      slopes_by_dropout_time.censored$mean[time.index] = mean(slope_sample_censored)
+      slopes_by_dropout_time.censored$median[time.index] = median(slope_sample_censored)
+      slopes_by_dropout_time.censored$ci_lower[time.index] = quantile(slope_sample_censored, na.rm=TRUE, probs=lower_tail)
+      slopes_by_dropout_time.censored$ci_upper[time.index] = quantile(slope_sample_censored, na.rm=TRUE, probs=upper_tail)
+    }  
+    row.names(slopes_by_dropout_time.censored) = NULL
+    
+    ## censored dropout time specific intercepts
+    intercepts_by_dropout_time.censored = data.frame(
+      time=model.options$dropout.estimationTimes.censored,
+      mean=numeric(length(model.options$dropout.estimationTimes.censored)),
+      median=numeric(length(model.options$dropout.estimationTimes.censored)),
+      ci_lower=numeric(length(model.options$dropout.estimationTimes.censored)),
+      ci_upper=numeric(length(model.options$dropout.estimationTimes.censored))
+    )
+    for (time.index in 1:(length(model.options$dropout.estimationTimes.censored))) {
+      int_sample_censored <- unlist(lapply(iterations, function(x) { 
+        return(x$intercept.dropoutTimes.censored[[group.index]][time.index])
+      }))
+      intercepts_by_dropout_time.censored$mean[time.index] = mean(int_sample_censored)
+      intercepts_by_dropout_time.censored$median[time.index] = median(int_sample_censored)
+      intercepts_by_dropout_time.censored$ci_lower[time.index] = quantile(int_sample_censored, na.rm=TRUE, probs=lower_tail)
+      intercepts_by_dropout_time.censored$ci_upper[time.index] = quantile(int_sample_censored, na.rm=TRUE, probs=upper_tail)
+    }  
+    row.names(intercepts_by_dropout_time.censored) = NULL
     # build the summary list
     result.summary[[paste("group", group, sep="_")]] = list(
       total_clusters = total_clusters,
       subject_specific_effects = subject_specific_effects,
       covariance_parameters = covariance_parameters,
       intercepts_by_dropout_time = intercepts_by_dropout_time,
-      slopes_by_dropout_time = slopes_by_dropout_time
+      slopes_by_dropout_time = slopes_by_dropout_time,
+      intercepts_by_dropout_time.censored = intercepts_by_dropout_time.censored,
+      slopes_by_dropout_time.censored = slopes_by_dropout_time.censored
     )
   }
   
@@ -1038,6 +1089,7 @@ summary.sensitivity.dirichlet.fit <- function(sensitivity.fit, tail.lower=0.025,
 #' @importFrom mvtnorm dmvnorm rmvnorm
 #' @importFrom Hmisc rMultinom
 #' @importFrom truncnorm rtruncnorm
+#' @importFrom tmvtnorm mtmvnorm
 #' @export
 #'
 informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, groups.var, 
@@ -1171,7 +1223,20 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       return (rep(0,length(model.options$dropout.estimationTimes)))
     })
   }
-  
+  # initialize the slope estimates at each censored droptime
+  start.slope.dropoutTimes.censored = NULL
+  if (!is.null(model.options$dropout.estimationTimes.censored)) {
+    start.slope.dropoutTimes.censored = lapply(groupList, function(group) {
+      return (rep(0,length(model.options$dropout.estimationTimes.censored)))
+    })
+  }
+  # initialize the intercept estimates at each censoreddroptime
+  start.intercept.dropoutTimes.censored = NULL
+  if (!is.null(model.options$dropout.estimationTimes.censored)) {
+    start.intercept.dropoutTimes.censored = lapply(groupList, function(group) {
+      return (rep(0,length(model.options$dropout.estimationTimes.censored)))
+    })
+  }
   # initialize the regression coefficients for the random intercept
   # and slope.  We append the log of the dropout time
   betas = lapply(groupList, function(group) {
@@ -1249,6 +1314,8 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
     expected.intercept=rep(0, length(groupList)), expected.slope=rep(0, length(groupList)),
     intercept.dropoutTimes = start.intercept.dropoutTimes,
     slope.dropoutTimes = start.slope.dropoutTimes,
+    intercept.dropoutTimes.censored = start.intercept.dropoutTimes.censored,
+    slope.dropoutTimes.censored = start.slope.dropoutTimes.censored,
     sigma.error = sigma.error
   )
   
@@ -1643,6 +1710,42 @@ informativeDropout.bayes.dirichlet <- function(data, ids.var, outcomes.var, grou
       } else {
         model.current$slope.dropoutTimes = NULL
         model.current$intercept.dropoutTimes = NULL 
+      }
+      
+      #Estimate slope at each censored dropout time
+      if (!is.null(model.options$dropout.estimationTimes.censored)) {
+        tmp = matrix(0,length(model.options$dropout.estimationTimes.censored), n.clusters)
+        for (h in 1:n.clusters) {
+          tmp[,h] = (
+            group.weights.mixing[h] * 
+              (1-pnorm(log(model.options$dropout.estimationTimes.censored),
+                      model.current$cluster.mu[[group.index]][h,3],
+                      sqrt(model.current$dp.cluster.sigma[[group.index]][3,3])))
+          ) 
+        }
+        
+        p = tmp / apply(tmp,1,sum)
+        for(u in 1:length(model.options$dropout.estimationTimes.censored)) {
+          covar = model.current$dp.cluster.sigma[[group.index]]
+          dropoutTime = model.options$dropout.estimationTimes.censored[u]
+          a = c(-Inf, -Inf, log(dropoutTime))
+          b = c(Inf, Inf, Inf)
+          moments = t(apply(model.current$cluster.mu[[group.index]], 1,function(x)
+            mtmvnorm(mean = x,
+                     sigma = covar,
+                     lower = a, 
+                     upper = b)$tmean))
+          moments = ifelse(is.nan(moments), 0, moments)
+          model.current$slope.dropoutTimes.censored[[group.index]][u] = (
+            sum(p[u,] * moments[,2])
+          )
+          model.current$intercept.dropoutTimes.censored[[group.index]][u] = (  
+            sum(p[u,] * moments[,1])
+          )
+        }
+      } else {
+        model.current$slope.dropoutTimes.censored = NULL
+        model.current$intercept.dropoutTimes.censored = NULL 
       }
       
       # Estimate E(B1), E(B0) - section 2.4 expectation of random effects (int, slope)
