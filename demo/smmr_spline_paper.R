@@ -178,14 +178,14 @@ others.slope<-do.call(rbind, pblapply(fit$iterations, function(x){
 }))
 
 quantile(others.slope, c(0.025, 0.975))
-mean(others.slope[20000:49999])
+mean(others.slope)
 
 druguse.slope<-do.call(rbind, pblapply(fit$iterations, function(x){
   x$slope.marginal[[2]]+x$betas.covariates[3]*log(267) + x$betas.covariates[4]*4.2
 }))
 
 quantile(druguse.slope, c(0.025, 0.975))
-mean(druguse.slope[20000:49999])
+mean(druguse.slope)
 
 covar <- do.call(rbind, pblapply(fit$iterations, function(x){
   x$betas.covariates
