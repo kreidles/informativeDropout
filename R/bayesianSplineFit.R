@@ -1754,8 +1754,10 @@ sensitivity.bayes.splines.fit <- function(fit, times.estimation, deltas,
       knots.boundary = range(knots)
       knots.interior = knots[-c(1,length(knots))] 
       
-      spline <- ns(times.dropout.group, knots = knots.interior, Boundary.knots = knots.boundary, intercept=T)
-
+      if (length(knots)>1){
+        spline <- ns(times.dropout.group, knots = knots.interior, Boundary.knots = knots.boundary, intercept=T)
+        }else{spline <- matrix(rep(1, length(times.dropout.group)), ncol=1)}
+      
       if (!is.null(betas.covariates.time)) {
         cBeta.time = as.matrix(data.group[,covariates.time.var]) %*% betas.covariates.time
       } else {
