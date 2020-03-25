@@ -14,10 +14,10 @@ Non-Ignorable Dropout, In review.
 
 ### Installation instructions
 
-The results in the above manuscript were produced using R version 3.2.4. To reproduce the results,
+The results in the above manuscript were produced using R version 3.6.2. To reproduce the results,
 perform the following steps:
 
-* Install R version 3.2.x or higher by following the instructions at http://www.r-project.org
+* Install R version 3.6.x or higher by following the instructions at http://www.r-project.org
 * From the R environment, install and load the "devtools" package
 ```R
 install.packages("devtools")
@@ -50,7 +50,7 @@ Install the informativeDropout package as described above.
 Run the DP model demo program
 
 ```R
-demo(smmr_spline_paper)
+demo(BNSV_paper)
 ```
 
 
