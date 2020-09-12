@@ -124,7 +124,8 @@ getInitialEstimatesCovariates <- function(dist, covariates, times, outcomes) {
 #' @param outcomes vector of outcomes
 #' 
 getInitialEstimatesTheta <- function(dist, groupList, groups, X, covariates, outcomes) {
-  data.theta = cbind(outcomes, X, covariates)
+  data.theta = cbind(outcomes, X)
+  if(!is.null(covariates)){data.theta = cbind(data.theta, covariates)}
   formula = as.formula(paste(c(paste(names(outcomes), "~"), 
                                paste(names(X)[2:length(names(X))], 
                                      collapse=" + ")), 
